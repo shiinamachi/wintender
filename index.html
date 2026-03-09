@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wintender Top Bar</title>
+    <style>
+      :root {
+        --bar-bg: rgba(20, 20, 25, 0.82);
+        --text-primary: #e0e0e0;
+        --text-secondary: #808080;
+        --warning: #f38ba8;
+        --hover: rgba(255, 255, 255, 0.1);
+        --border: rgba(255, 255, 255, 0.06);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        height: 32px;
+        overflow: hidden;
+      }
+
+      body {
+        font-family:
+          "JetBrainsMonohangul NF Regular",
+          "JetBrainsMono Nerd Font",
+          "CaskaydiaCove Nerd Font",
+          "Segoe UI",
+          monospace;
+        font-size: 13px;
+        color: var(--text-primary);
+        user-select: none;
+      }
+
+      .bar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center;
+        gap: 12px;
+        height: 32px;
+        width: 100%;
+        padding: 0 14px;
+        background: var(--bar-bg);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 12px;
+      }
+
+      .section-left {
+        justify-content: flex-start;
+      }
+
+      .section-center {
+        justify-content: center;
+      }
+
+      .section-right {
+        justify-content: flex-end;
+        overflow: hidden;
+      }
+
+      .tray {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 6px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        gap: 6px;
+        height: 24px;
+        padding: 0 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+      }
+
+      .pill {
+        color: var(--text-primary);
+      }
+
+      .interactive {
+        cursor: pointer;
+      }
+
+      .muted {
+        color: var(--text-secondary);
+      }
+
+      .media-text,
+      .network-text,
+      .audio-text,
+      .battery-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .interactive:hover {
+        background: var(--hover);
+      }
+
+      .datetime {
+        min-width: 0;
+      }
+
+      .status-icon {
+        flex: 0 0 auto;
+        font-size: 14px;
+        line-height: 1;
+      }
+
+      .tray {
+        position: relative;
+        padding: 0 2px;
+      }
+
+      .tray-overflow {
+        position: relative;
+      }
+
+      .tray-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      .tray-button:hover {
+        background: var(--hover);
+      }
+
+      .tray-button img {
+        width: 16px;
+        height: 16px;
+      }
+
+      .tray-more {
+        min-width: 30px;
+        padding: 0 6px;
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+
+      .tray-popover {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 30px;
+        padding: 6px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(24, 24, 30, 0.94);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+        z-index: 10;
+      }
+
+      .warning {
+        color: var(--warning);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <div class="section section-left" aria-hidden="true"></div>
+      <div class="section section-center">
+        <div id="datetime" class="pill datetime"></div>
+      </div>
+      <div class="section section-right">
+        <div id="media" class="pill hidden"></div>
+        <div id="systray" class="tray hidden"></div>
+        <div id="network" class="pill interactive hidden"></div>
+        <div id="audio" class="pill interactive hidden"></div>
+        <div id="battery" class="pill hidden"></div>
+      </div>
+    </div>
+    <script type="module">
+      import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
+
+      const MEDIA_TEXT_LIMIT = 28;
+      const VOLUME_STEP = 5;
+      const PINNED_TRAY_TOOLTIPS = [
+        "Windows Security",
+        "AutoHotkey",
+        "OneDrive",
+      ];
+
+      const elements = {
+        datetime: document.getElementById("datetime"),
+        media: document.getElementById("media"),
+        systray: document.getElementById("systray"),
+        network: document.getElementById("network"),
+        audio: document.getElementById("audio"),
+        battery: document.getElementById("battery"),
+      };
+
+      const providers = zebar.createProviderGroup({
+        date: { type: "date", refreshInterval: 1000 },
+        battery: { type: "battery", refreshInterval: 10000 },
+        network: { type: "network", refreshInterval: 5000 },
+        audio: { type: "audio" },
+        systray: { type: "systray" },
+        media: { type: "media" },
+      });
+
+      function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+      }
+
+      function truncate(text, maxLength) {
+        if (!text) {
+          return "";
+        }
+
+        return text.length > maxLength
+          ? `${text.slice(0, maxLength - 1)}…`
+          : text;
+      }
+
+      function toggleHidden(element, hidden) {
+        element.classList.toggle("hidden", hidden);
+      }
+
+      function iconSpan(icon) {
+        const span = document.createElement("span");
+        span.className = "status-icon";
+        span.textContent = icon;
+        return span;
+      }
+
+      function textSpan(className, text) {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = text;
+        return span;
+      }
+
+      function clearElement(element) {
+        while (element.firstChild) {
+          element.removeChild(element.firstChild);
+        }
+      }
+
+      function normalizeText(text) {
+        return typeof text === "string" ? text.trim() : "";
+      }
+
+      function formatDate(now) {
+        if (!now) {
+          return "--";
+        }
+
+        const date = new Date(now);
+
+        const datePart = date.toLocaleDateString("ko-KR", {
+          month: "long",
+          day: "numeric",
+          weekday: "short",
+        });
+        const timePart = date.toLocaleTimeString("ko-KR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+
+        return `${datePart} ${timePart}`;
+      }
+
+      function getMediaState(mediaOutput) {
+        const session = mediaOutput?.currentSession ?? null;
+
+        if (!session || (!session.artist && !session.title)) {
+          return null;
+        }
+
+        const artist = session.artist?.trim();
+        const title = session.title?.trim();
+        const text = truncate(
+          [artist, title].filter(Boolean).join(" - ") || title || artist || "",
+          MEDIA_TEXT_LIMIT,
+        );
+
+        return {
+          icon: session.isPlaying ? "󰏤" : "󰐊",
+          text,
+        };
+      }
+
+      function getNetworkState(networkOutput) {
+        const defaultInterface = networkOutput?.defaultInterface ?? null;
+        const gateway = networkOutput?.defaultGateway ?? null;
+
+        if (!defaultInterface) {
+          return {
+            icon: "󰤭",
+            text: "No Network",
+          };
+        }
+
+        if (defaultInterface.type === "wifi") {
+          return {
+            icon: "󰤨",
+            text: gateway?.ssid || defaultInterface.friendlyName || "Wi-Fi",
+          };
+        }
+
+        if (defaultInterface.type === "ethernet") {
+          return {
+            icon: "󰈀",
+            text: "Ethernet",
+          };
+        }
+
+        if (
+          defaultInterface.type === "mobile_broadband" ||
+          defaultInterface.type === "generic_modem" ||
+          defaultInterface.type === "ppp"
+        ) {
+          const text =
+            normalizeText(defaultInterface.friendlyName) ||
+            normalizeText(defaultInterface.description) ||
+            normalizeText(defaultInterface.name) ||
+            "Cellular";
+
+          return {
+            icon: "󰢿",
+            text,
+          };
+        }
+
+        return {
+          icon: "󰤭",
+          text: defaultInterface.friendlyName || defaultInterface.name || "No Network",
+        };
+      }
+
+      function getNetworkFlyoutTargets() {
+        return ["ms-availablenetworks:", "ms-settings:network"];
+      }
+
+      async function openNetworkFlyout() {
+        for (const target of getNetworkFlyoutTargets()) {
+          try {
+            await zebar.shellSpawn("explorer.exe", [target]);
+            return;
+          } catch (error) {
+            console.error(`Failed to open network target: ${target}`, error);
+          }
+        }
+      }
+
+      function getAudioState(audioOutput) {
+        const device = audioOutput?.defaultPlaybackDevice ?? null;
+
+        if (!device) {
+          return null;
+        }
+
+        const volume = Math.round(device.volume ?? 0);
+        const isMuted = Boolean(device.isMuted) || volume === 0;
+        let icon = "󰕾";
+
+        if (isMuted) {
+          icon = "󰖁";
+        } else if (volume <= 33) {
+          icon = "󰕿";
+        } else if (volume <= 66) {
+          icon = "󰖀";
+        }
+
+        return {
+          icon,
+          text: `${volume}%`,
+          volume,
+          isMuted,
+          deviceId: device.deviceId,
+        };
+      }
+
+      function getBatteryState(batteryOutput) {
+        if (!batteryOutput || typeof batteryOutput.chargePercent !== "number") {
+          return null;
+        }
+
+        const percent = Math.round(batteryOutput.chargePercent);
+        let icon = "󰁹";
+
+        if (batteryOutput.isCharging) {
+          icon = "󰂄";
+        } else if (percent >= 90) {
+          icon = "󰁹";
+        } else if (percent >= 60) {
+          icon = "󰂁";
+        } else if (percent >= 30) {
+          icon = "󰁾";
+        } else if (percent >= 10) {
+          icon = "󰁻";
+        } else {
+          icon = "󰂎";
+        }
+
+        return {
+          icon,
+          text: `${percent}%`,
+          isWarning: !batteryOutput.isCharging && percent < 10,
+        };
+      }
+
+      function isPinnedTrayIcon(icon) {
+        const tooltip = normalizeText(icon?.tooltip);
+        return tooltip ? PINNED_TRAY_TOOLTIPS.includes(tooltip) : false;
+      }
+
+      function getTrayGroups(systrayOutput) {
+        const icons = systrayOutput?.icons ?? [];
+        const pinnedIcons = [];
+        const overflowIcons = [];
+
+        icons.forEach((icon) => {
+          if (isPinnedTrayIcon(icon)) {
+            pinnedIcons.push(icon);
+          } else {
+            overflowIcons.push(icon);
+          }
+        });
+
+        return { pinnedIcons, overflowIcons };
+      }
+
+      function closeTrayOverflow() {
+        // Overflow tray icons are rendered in a separate popup widget.
+      }
+
+      async function openTrayPopup(event, overflowCount) {
+        const button = event.currentTarget;
+
+        if (!(button instanceof HTMLElement) || overflowCount <= 0) {
+          return;
+        }
+
+        const current = zebar.currentWidget();
+        const anchorRect = button.getBoundingClientRect();
+        const maxColumns = 8;
+        const columns = Math.min(Math.max(overflowCount, 1), maxColumns);
+        const rows = Math.max(1, Math.ceil(overflowCount / maxColumns));
+        const popupWidth = columns * 28 + 20;
+        const popupHeight = rows * 28 + 16;
+        const offsetX = Math.max(8, Math.round(anchorRect.right - popupWidth));
+        const offsetY = Math.max(36, Math.round(anchorRect.bottom + 8));
+
+        try {
+          await zebar.startWidget(
+            "tray-popup",
+            {
+              anchor: "top_left",
+              offsetX: `${offsetX}px`,
+              offsetY: `${offsetY}px`,
+              width: `${popupWidth}px`,
+              height: `${popupHeight}px`,
+              monitorSelection: { type: "primary" },
+              dockToEdge: {
+                enabled: false,
+                edge: null,
+                windowMargin: "0px",
+              },
+            },
+            { packId: current.packId },
+          );
+        } catch (error) {
+          console.error("Dynamic tray popup launch failed, falling back to preset", error);
+          await zebar.startWidgetPreset("tray-popup", "default", {
+            packId: current.packId,
+          });
+        }
+      }
+
+      function buildTrayButton(icon, systrayOutput) {
+        const button = document.createElement("button");
+        const image = document.createElement("img");
+
+        button.className = "tray-button";
+        button.title = icon.tooltip || "";
+        image.src = icon.iconUrl;
+        image.alt = icon.tooltip || "tray icon";
+
+        button.appendChild(image);
+
+        button.addEventListener("mouseenter", () => {
+          systrayOutput.onHoverEnter?.(icon.id);
+        });
+        button.addEventListener("mouseleave", () => {
+          systrayOutput.onHoverLeave?.(icon.id);
+        });
+        button.addEventListener("mousemove", () => {
+          systrayOutput.onHoverMove?.(icon.id);
+        });
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          systrayOutput.onLeftClick?.(icon.id);
+          closeTrayOverflow();
+        });
+        button.addEventListener("auxclick", (event) => {
+          if (event.button === 1) {
+            systrayOutput.onMiddleClick?.(icon.id);
+            closeTrayOverflow();
+          }
+        });
+        button.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          systrayOutput.onRightClick?.(icon.id);
+          closeTrayOverflow();
+        });
+
+        return button;
+      }
+
+      function renderDate(dateOutput) {
+        elements.datetime.textContent = formatDate(dateOutput?.now);
+      }
+
+      function renderMedia(mediaOutput) {
+        const state = getMediaState(mediaOutput);
+        clearElement(elements.media);
+
+        if (!state) {
+          toggleHidden(elements.media, true);
+          return;
+        }
+
+        elements.media.appendChild(iconSpan(state.icon));
+        elements.media.appendChild(textSpan("media-text", state.text));
+        toggleHidden(elements.media, false);
+      }
+
+      function renderSystray(systrayOutput) {
+        clearElement(elements.systray);
+        const { pinnedIcons, overflowIcons } = getTrayGroups(systrayOutput);
+        const icons = systrayOutput?.icons ?? [];
+
+        if (!icons.length) {
+          closeTrayOverflow();
+          toggleHidden(elements.systray, true);
+          return;
+        }
+
+        pinnedIcons.forEach((icon) => {
+          elements.systray.appendChild(buildTrayButton(icon, systrayOutput));
+        });
+
+        if (overflowIcons.length) {
+          const overflow = document.createElement("div");
+          const toggle = document.createElement("button");
+
+          overflow.className = "tray-overflow";
+          toggle.className = "tray-button tray-more";
+          toggle.type = "button";
+          toggle.textContent = `+${overflowIcons.length}`;
+          toggle.title = "More tray icons";
+          toggle.setAttribute("aria-haspopup", "dialog");
+          toggle.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            await openTrayPopup(event, overflowIcons.length);
+          });
+
+          overflow.appendChild(toggle);
+          elements.systray.appendChild(overflow);
+        } else {
+          closeTrayOverflow();
+        }
+
+        toggleHidden(elements.systray, false);
+      }
+
+      function renderNetwork(networkOutput) {
+        const state = getNetworkState(networkOutput);
+        clearElement(elements.network);
+        elements.network.onclick = null;
+        elements.network.appendChild(iconSpan(state.icon));
+        elements.network.appendChild(textSpan("network-text", state.text));
+        elements.network.onclick = () => {
+          openNetworkFlyout();
+        };
+        toggleHidden(elements.network, false);
+      }
+
+      function renderAudio(audioOutput) {
+        const state = getAudioState(audioOutput);
+        clearElement(elements.audio);
+        elements.audio.onwheel = null;
+        elements.audio.onclick = null;
+
+        if (!state) {
+          toggleHidden(elements.audio, true);
+          return;
+        }
+
+        elements.audio.appendChild(iconSpan(state.icon));
+        elements.audio.appendChild(textSpan("audio-text", state.text));
+        elements.audio.onclick = () => {
+          audioOutput.setMute?.(!state.isMuted, { deviceId: state.deviceId });
+        };
+        elements.audio.onwheel = (event) => {
+          event.preventDefault();
+          const direction = event.deltaY > 0 ? -1 : 1;
+          const nextVolume = clamp(state.volume + direction * VOLUME_STEP, 0, 100);
+          audioOutput.setVolume?.(nextVolume, { deviceId: state.deviceId });
+        };
+
+        toggleHidden(elements.audio, false);
+      }
+
+      function renderBattery(batteryOutput) {
+        const state = getBatteryState(batteryOutput);
+        clearElement(elements.battery);
+        elements.battery.classList.toggle("warning", false);
+
+        if (!state) {
+          toggleHidden(elements.battery, true);
+          return;
+        }
+
+        elements.battery.appendChild(iconSpan(state.icon));
+        elements.battery.appendChild(textSpan("battery-text", state.text));
+        elements.battery.classList.toggle("warning", state.isWarning);
+        toggleHidden(elements.battery, false);
+      }
+
+      providers.onOutput((output) => {
+        renderDate(output.date);
+        renderMedia(output.media);
+        renderSystray(output.systray);
+        renderNetwork(output.network);
+        renderAudio(output.audio);
+        renderBattery(output.battery);
+      });
+
+      providers.onError((error) => {
+        console.error("Zebar provider error", error);
+      });
+    </script>
+  </body>
+</html>

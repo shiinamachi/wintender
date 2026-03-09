@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wintender Tray Popup</title>
+    <style>
+      :root {
+        --popup-bg: rgba(24, 24, 30, 0.94);
+        --text-primary: #e0e0e0;
+        --hover: rgba(255, 255, 255, 0.1);
+        --border: rgba(255, 255, 255, 0.06);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        font-family:
+          "JetBrainsMonohangul NF Regular",
+          "JetBrainsMono Nerd Font",
+          "CaskaydiaCove Nerd Font",
+          "Segoe UI",
+          monospace;
+        color: var(--text-primary);
+        user-select: none;
+        background: transparent;
+      }
+
+      .popup {
+        display: flex;
+        align-content: flex-start;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+        height: 100%;
+        padding: 6px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--popup-bg);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+      }
+
+      .tray-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      .tray-button:hover {
+        background: var(--hover);
+      }
+
+      .tray-button img {
+        width: 16px;
+        height: 16px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="popup" class="popup hidden"></div>
+
+    <script type="module">
+      import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
+
+      const PINNED_TRAY_TOOLTIPS = [
+        "Windows Security",
+        "AutoHotkey",
+        "OneDrive",
+      ];
+      const CONTEXT_MENU_BLUR_GRACE_MS = 400;
+
+      const popup = document.getElementById("popup");
+      const widget = zebar.currentWidget();
+      const providers = zebar.createProviderGroup({
+        systray: { type: "systray" },
+      });
+      let suppressBlurCloseUntil = 0;
+
+      function clearElement(element) {
+        while (element.firstChild) {
+          element.removeChild(element.firstChild);
+        }
+      }
+
+      function normalizeText(text) {
+        return typeof text === "string" ? text.trim() : "";
+      }
+
+      function isPinnedTrayIcon(icon) {
+        const tooltip = normalizeText(icon?.tooltip);
+        return tooltip ? PINNED_TRAY_TOOLTIPS.includes(tooltip) : false;
+      }
+
+      function shouldClosePopupOnTrayInteraction(action) {
+        return action === "left" || action === "middle";
+      }
+
+      function getBlurCloseSuppressionUntil(now = Date.now()) {
+        return now + CONTEXT_MENU_BLUR_GRACE_MS;
+      }
+
+      function shouldClosePopupOnBlur(suppressionUntil, now = Date.now()) {
+        return now >= suppressionUntil;
+      }
+
+      async function closePopup() {
+        await widget.close();
+      }
+
+      function buildTrayButton(icon, systrayOutput) {
+        const button = document.createElement("button");
+        const image = document.createElement("img");
+
+        button.className = "tray-button";
+        button.type = "button";
+        button.title = icon.tooltip || "";
+        image.src = icon.iconUrl;
+        image.alt = icon.tooltip || "tray icon";
+        button.appendChild(image);
+
+        button.addEventListener("mouseenter", () => {
+          systrayOutput.onHoverEnter?.(icon.id);
+        });
+        button.addEventListener("mouseleave", () => {
+          systrayOutput.onHoverLeave?.(icon.id);
+        });
+        button.addEventListener("mousemove", () => {
+          systrayOutput.onHoverMove?.(icon.id);
+        });
+        button.addEventListener("click", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          systrayOutput.onLeftClick?.(icon.id);
+
+          if (shouldClosePopupOnTrayInteraction("left")) {
+            await closePopup();
+          }
+        });
+        button.addEventListener("auxclick", async (event) => {
+          if (event.button === 1) {
+            systrayOutput.onMiddleClick?.(icon.id);
+
+            if (shouldClosePopupOnTrayInteraction("middle")) {
+              await closePopup();
+            }
+          }
+        });
+        button.addEventListener("contextmenu", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          suppressBlurCloseUntil = getBlurCloseSuppressionUntil();
+          systrayOutput.onRightClick?.(icon.id);
+
+          if (shouldClosePopupOnTrayInteraction("right")) {
+            await closePopup();
+          }
+        });
+
+        return button;
+      }
+
+      providers.onOutput((output) => {
+        const icons = (output.systray?.icons ?? []).filter((icon) => !isPinnedTrayIcon(icon));
+
+        clearElement(popup);
+
+        if (!icons.length) {
+          closePopup();
+          return;
+        }
+
+        icons.forEach((icon) => {
+          popup.appendChild(buildTrayButton(icon, output.systray));
+        });
+
+        popup.classList.remove("hidden");
+      });
+
+      providers.onError((error) => {
+        console.error("Tray popup provider error", error);
+      });
+
+      widget.tauriWindow.listen("tauri://blur", () => {
+        if (!shouldClosePopupOnBlur(suppressBlurCloseUntil)) {
+          return;
+        }
+
+        closePopup();
+      });
+    </script>
+  </body>
+</html>

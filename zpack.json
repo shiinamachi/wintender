@@ -1,0 +1,84 @@
+{
+  "$schema": "https://github.com/glzr-io/zebar/raw/v3.1.1/resources/zpack-schema.json",
+  "name": "wintender",
+  "version": "0.0.0",
+  "description": "wintender top bar for Windows 11",
+  "tags": ["status-bar"],
+  "widgets": [
+    {
+      "name": "top-bar",
+      "htmlPath": "./index.html",
+      "zOrder": "top_most",
+      "shownInTaskbar": false,
+      "focused": false,
+      "resizable": false,
+      "transparent": true,
+      "includeFiles": ["*.html", "resources/*"],
+      "privileges": {
+        "shellCommands": [
+          {
+            "program": "explorer.exe",
+            "argsRegex": "^(ms-availablenetworks:|ms-settings:network)$"
+          }
+        ]
+      },
+      "presets": [
+        {
+          "name": "default",
+          "anchor": "top_left",
+          "offsetX": "0px",
+          "offsetY": "0px",
+          "width": "100%",
+          "height": "32px",
+          "monitorSelection": {
+            "type": "all"
+          },
+          "dockToEdge": {
+            "enabled": true,
+            "edge": "top",
+            "windowMargin": "0px"
+          }
+        }
+      ],
+      "providers": [
+        "date",
+        "battery",
+        "network",
+        "audio",
+        "systray",
+        "media"
+      ]
+    },
+    {
+      "name": "tray-popup",
+      "htmlPath": "./tray-popup.html",
+      "zOrder": "top_most",
+      "shownInTaskbar": false,
+      "focused": true,
+      "resizable": false,
+      "transparent": true,
+      "includeFiles": ["*.html", "resources/*"],
+      "presets": [
+        {
+          "name": "default",
+          "anchor": "top_right",
+          "offsetX": "0px",
+          "offsetY": "40px",
+          "width": "220px",
+          "height": "44px",
+          "monitorSelection": {
+            "type": "primary"
+          },
+          "dockToEdge": {
+            "enabled": false,
+            "edge": null,
+            "windowMargin": "0px"
+          }
+        }
+      ],
+      "providers": [
+        "systray"
+      ]
+    }
+  ]
+}
