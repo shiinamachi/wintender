@@ -19,6 +19,18 @@
           {
             "program": "netsh.exe",
             "argsRegex": "^mbn show interfaces$"
+          },
+          {
+            "program": "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
+            "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
+          },
+          {
+            "program": "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
+            "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
+          },
+          {
+            "program": "komorebic.exe",
+            "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
           }
         ]
       },
@@ -41,6 +53,7 @@
         }
       ],
       "providers": [
+        "komorebi",
         "date",
         "battery",
         "network",

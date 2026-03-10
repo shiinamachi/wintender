@@ -9,6 +9,7 @@
                 --bar-bg: rgba(20, 20, 25, 0.82);
                 --text-primary: #e0e0e0;
                 --text-secondary: #808080;
+                --accent: #89b4fa;
                 --warning: #f38ba8;
                 --hover: rgba(255, 255, 255, 0.1);
                 --border: rgba(255, 255, 255, 0.06);
@@ -58,6 +59,7 @@
 
             .section-left {
                 justify-content: flex-start;
+                overflow: hidden;
             }
 
             .section-center {
@@ -74,6 +76,14 @@
                 align-items: center;
                 min-width: 0;
                 gap: 6px;
+            }
+
+            .workspaces {
+                display: flex;
+                align-items: center;
+                min-width: 0;
+                gap: 6px;
+                overflow: hidden;
             }
 
             .pill {
@@ -100,12 +110,29 @@
             }
 
             .media-text,
+            .workspace-text,
             .network-text,
             .audio-text,
             .battery-text {
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+            }
+
+            .workspace-pill {
+                max-width: 96px;
+                border: 0;
+                background: transparent;
+                color: var(--text-primary);
+                font: inherit;
+                transition:
+                    background 0.15s ease,
+                    color 0.15s ease;
+            }
+
+            .workspace-pill-active {
+                background: rgba(137, 180, 250, 0.18);
+                color: var(--accent);
             }
 
             .interactive:hover {
@@ -187,7 +214,9 @@
     </head>
     <body>
         <div class="bar">
-            <div class="section section-left" aria-hidden="true"></div>
+            <div class="section section-left">
+                <div id="workspaces" class="workspaces hidden"></div>
+            </div>
             <div class="section section-center">
                 <div id="datetime" class="pill datetime"></div>
             </div>
@@ -207,6 +236,11 @@
             const CELLULAR_SIGNAL_REFRESH_INTERVAL = 5000;
             const QUICK_SETTINGS_POPUP_WIDTH = 420;
             const QUICK_SETTINGS_POPUP_HEIGHT = 384;
+            const KOMOREBIC_PROGRAM_CANDIDATES = [
+                "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
+                "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
+                "komorebic.exe",
+            ];
             const PINNED_TRAY_TOOLTIPS = [
                 "Windows Security",
                 "AutoHotkey",
@@ -214,6 +248,7 @@
             ];
 
             const elements = {
+                workspaces: document.getElementById("workspaces"),
                 datetime: document.getElementById("datetime"),
                 media: document.getElementById("media"),
                 systray: document.getElementById("systray"),
@@ -223,6 +258,7 @@
             };
 
             const providers = zebar.createProviderGroup({
+                komorebi: { type: "komorebi" },
                 date: { type: "date", refreshInterval: 1000 },
                 battery: { type: "battery", refreshInterval: 10000 },
                 network: { type: "network", refreshInterval: 5000 },
@@ -231,6 +267,7 @@
                 media: { type: "media" },
             });
             const state = {
+                latestKomorebiOutput: null,
                 latestNetworkOutput: null,
                 cellularSignalStrength: null,
                 cellularSignalUpdatedAt: 0,
@@ -387,6 +424,349 @@
                     icon: session.isPlaying ? "󰏤" : "󰐊",
                     text,
                 };
+            }
+
+            function getCoordinateDistance(pointA, pointB) {
+                return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
+            }
+
+            function getKomorebicProgramCandidates() {
+                return [...KOMOREBIC_PROGRAM_CANDIDATES];
+            }
+
+            function isProgramNotFoundShellError(error) {
+                return normalizeText(error?.message)
+                    .toLowerCase()
+                    .includes("program not found");
+            }
+
+            function getCurrentWidgetScreenPosition(options = {}) {
+                const fallbackWindow =
+                    typeof window === "object" && window ? window : null;
+                const x = Number.isFinite(options.x)
+                    ? options.x
+                    : fallbackWindow?.screenX;
+                const y = Number.isFinite(options.y)
+                    ? options.y
+                    : fallbackWindow?.screenY;
+
+                return {
+                    x: Number.isFinite(x) ? x : 0,
+                    y: Number.isFinite(y) ? y : 0,
+                };
+            }
+
+            function normalizeKomorebiWindow(rawWindow) {
+                if (!rawWindow || typeof rawWindow !== "object") {
+                    return null;
+                }
+
+                return {
+                    class: rawWindow.class ?? null,
+                    exe: rawWindow.exe ?? null,
+                    hwnd: rawWindow.hwnd ?? 0,
+                    title: rawWindow.title ?? null,
+                };
+            }
+
+            function normalizeKomorebiWindows(rawCollection) {
+                const windows = rawCollection?.elements ?? rawCollection ?? [];
+
+                if (!Array.isArray(windows)) {
+                    return [];
+                }
+
+                return windows
+                    .map((window) => normalizeKomorebiWindow(window))
+                    .filter(Boolean);
+            }
+
+            function normalizeKomorebiContainer(rawContainer) {
+                if (!rawContainer || typeof rawContainer !== "object") {
+                    return null;
+                }
+
+                return {
+                    id: rawContainer.id ?? "",
+                    windows: normalizeKomorebiWindows(rawContainer.windows),
+                };
+            }
+
+            function normalizeKomorebiLayout(rawLayout) {
+                const defaultLayout = normalizeText(
+                    rawLayout?.Default ?? rawLayout?.default,
+                );
+                const layouts = {
+                    BSP: "bsp",
+                    VerticalStack: "vertical_stack",
+                    HorizontalStack: "horizontal_stack",
+                    UltrawideVerticalStack: "ultrawide_vertical_stack",
+                    Rows: "rows",
+                    Grid: "grid",
+                    RightMainVerticalStack: "right_main_vertical_stack",
+                };
+
+                return layouts[defaultLayout] ?? "custom";
+            }
+
+            function normalizeKomorebiLayoutFlip(rawFlip) {
+                const normalized = normalizeText(rawFlip);
+                const flips = {
+                    Horizontal: "horizontal",
+                    Vertical: "vertical",
+                    HorizontalAndVertical: "horizontal_and_vertical",
+                };
+
+                return flips[normalized] ?? null;
+            }
+
+            function normalizeKomorebiWorkspace(rawWorkspace) {
+                if (!rawWorkspace || typeof rawWorkspace !== "object") {
+                    return null;
+                }
+
+                const containers = rawWorkspace.containers?.elements ?? [];
+
+                return {
+                    containerPadding: rawWorkspace.container_padding ?? null,
+                    floatingWindows: normalizeKomorebiWindows(
+                        rawWorkspace.floating_windows,
+                    ),
+                    focusedContainerIndex: Number.isInteger(
+                        rawWorkspace.containers?.focused,
+                    )
+                        ? rawWorkspace.containers.focused
+                        : 0,
+                    latestLayout: Array.isArray(rawWorkspace.latest_layout)
+                        ? rawWorkspace.latest_layout
+                        : [],
+                    layout: normalizeKomorebiLayout(rawWorkspace.layout),
+                    layoutFlip: normalizeKomorebiLayoutFlip(
+                        rawWorkspace.layout_flip,
+                    ),
+                    maximizedWindow: normalizeKomorebiWindow(
+                        rawWorkspace.maximized_window,
+                    ),
+                    monocleContainer: normalizeKomorebiContainer(
+                        rawWorkspace.monocle_container,
+                    ),
+                    name: rawWorkspace.name ?? null,
+                    tilingContainers: Array.isArray(containers)
+                        ? containers
+                              .map((container) =>
+                                  normalizeKomorebiContainer(container),
+                              )
+                              .filter(Boolean)
+                        : [],
+                    workspacePadding: rawWorkspace.workspace_padding ?? null,
+                };
+            }
+
+            function normalizeKomorebiMonitor(rawMonitor) {
+                if (!rawMonitor || typeof rawMonitor !== "object") {
+                    return null;
+                }
+
+                const workspaces = rawMonitor.workspaces?.elements ?? [];
+
+                return {
+                    id: rawMonitor.id ?? -1,
+                    deviceId:
+                        rawMonitor.device_id ?? rawMonitor.deviceId ?? "",
+                    focusedWorkspaceIndex: Number.isInteger(
+                        rawMonitor.workspaces?.focused,
+                    )
+                        ? rawMonitor.workspaces.focused
+                        : 0,
+                    name: rawMonitor.name ?? "",
+                    size: rawMonitor.size ?? null,
+                    workAreaOffset:
+                        rawMonitor.work_area_offset ??
+                        rawMonitor.workAreaOffset ??
+                        null,
+                    workAreaSize:
+                        rawMonitor.work_area_size ??
+                        rawMonitor.workAreaSize ??
+                        null,
+                    workspaces: Array.isArray(workspaces)
+                        ? workspaces
+                              .map((workspace) =>
+                                  normalizeKomorebiWorkspace(workspace),
+                              )
+                              .filter(Boolean)
+                        : [],
+                };
+            }
+
+            function parseKomorebiStateOutput(stdout, options = {}) {
+                if (typeof stdout !== "string" || !stdout.trim()) {
+                    return null;
+                }
+
+                let parsed;
+
+                try {
+                    parsed = JSON.parse(stdout);
+                } catch (error) {
+                    console.error("Failed to parse komorebi state output", error);
+                    return null;
+                }
+
+                const rawMonitors = parsed?.monitors?.elements ?? [];
+                const allMonitors = Array.isArray(rawMonitors)
+                    ? rawMonitors
+                          .map((monitor) => normalizeKomorebiMonitor(monitor))
+                          .filter(Boolean)
+                    : [];
+
+                if (!allMonitors.length) {
+                    return null;
+                }
+
+                const focusedMonitorIndex = Number.isInteger(
+                    parsed?.monitors?.focused,
+                )
+                    ? parsed.monitors.focused
+                    : 0;
+                const currentPosition =
+                    getCurrentWidgetScreenPosition(options);
+                const currentMonitor = allMonitors.reduce((closest, candidate) =>
+                    getCoordinateDistance(currentPosition, {
+                        x: candidate.workAreaSize?.left ?? 0,
+                        y: candidate.workAreaSize?.top ?? 0,
+                    }) <
+                    getCoordinateDistance(currentPosition, {
+                        x: closest.workAreaSize?.left ?? 0,
+                        y: closest.workAreaSize?.top ?? 0,
+                    })
+                        ? candidate
+                        : closest,
+                );
+                const focusedMonitor =
+                    allMonitors[focusedMonitorIndex] ?? allMonitors[0];
+
+                return {
+                    displayedWorkspace:
+                        currentMonitor?.workspaces?.[
+                            currentMonitor.focusedWorkspaceIndex
+                        ] ?? null,
+                    focusedWorkspace:
+                        focusedMonitor?.workspaces?.[
+                            focusedMonitor.focusedWorkspaceIndex
+                        ] ?? null,
+                    currentWorkspaces: currentMonitor?.workspaces ?? [],
+                    allWorkspaces: allMonitors.flatMap(
+                        (monitor) => monitor.workspaces,
+                    ),
+                    allMonitors,
+                    focusedMonitor,
+                    currentMonitor,
+                    focusedMonitorIndex,
+                };
+            }
+
+            async function runKomorebicCommand(
+                args,
+                executor = (program, commandArgs) =>
+                    zebar.shellExec(program, commandArgs),
+            ) {
+                let lastError = null;
+
+                for (const program of getKomorebicProgramCandidates()) {
+                    try {
+                        return await executor(program, args);
+                    } catch (error) {
+                        lastError = error;
+
+                        if (!isProgramNotFoundShellError(error)) {
+                            throw error;
+                        }
+                    }
+                }
+
+                throw lastError;
+            }
+
+            function getKomorebiWorkspaceLabel(workspace, index) {
+                const name = normalizeText(workspace?.name);
+                return name || String(index + 1);
+            }
+
+            function getCurrentKomorebiMonitorIndex(komorebiOutput) {
+                const currentMonitor = komorebiOutput?.currentMonitor ?? null;
+                const allMonitors = komorebiOutput?.allMonitors ?? [];
+
+                if (!currentMonitor || !allMonitors.length) {
+                    return -1;
+                }
+
+                return allMonitors.findIndex((monitor) => {
+                    if (!monitor) {
+                        return false;
+                    }
+
+                    if (
+                        normalizeText(currentMonitor.deviceId) &&
+                        monitor.deviceId === currentMonitor.deviceId
+                    ) {
+                        return true;
+                    }
+
+                    if (
+                        Number.isFinite(currentMonitor.id) &&
+                        monitor.id === currentMonitor.id
+                    ) {
+                        return true;
+                    }
+
+                    if (
+                        !normalizeText(currentMonitor.name) ||
+                        !monitor.workAreaSize ||
+                        !currentMonitor.workAreaSize
+                    ) {
+                        return false;
+                    }
+
+                    return (
+                        normalizeText(monitor.name) ===
+                            normalizeText(currentMonitor.name) &&
+                        monitor.workAreaSize?.left ===
+                            currentMonitor.workAreaSize?.left &&
+                        monitor.workAreaSize?.top ===
+                            currentMonitor.workAreaSize?.top
+                    );
+                });
+            }
+
+            function getKomorebiWorkspaceItems(komorebiOutput) {
+                const workspaces = komorebiOutput?.currentWorkspaces ?? [];
+                const activeIndex = Number.isInteger(
+                    komorebiOutput?.currentMonitor?.focusedWorkspaceIndex,
+                )
+                    ? komorebiOutput.currentMonitor.focusedWorkspaceIndex
+                    : -1;
+
+                return workspaces.map((workspace, index) => ({
+                    index,
+                    label: getKomorebiWorkspaceLabel(workspace, index),
+                    isActive: index === activeIndex,
+                }));
+            }
+
+            function getKomorebiFocusWorkspaceCommand(
+                komorebiOutput,
+                workspaceIndex,
+            ) {
+                if (!Number.isInteger(workspaceIndex) || workspaceIndex < 0) {
+                    return null;
+                }
+
+                const monitorIndex =
+                    getCurrentKomorebiMonitorIndex(komorebiOutput);
+
+                return monitorIndex < 0
+                    ? null
+                    : `focus-monitor-workspace ${monitorIndex} ${workspaceIndex}`;
             }
 
             function getNetworkState(networkOutput, options = {}) {
@@ -760,6 +1140,79 @@
                 toggleHidden(elements.media, false);
             }
 
+            async function focusKomorebiWorkspace(
+                command,
+                {
+                    runCommand = runKomorebicCommand,
+                    refreshState = refreshKomorebiState,
+                } = {},
+            ) {
+                if (!command) {
+                    return;
+                }
+
+                try {
+                    await runCommand(command);
+                    await refreshState();
+                } catch (error) {
+                    console.error("Failed to focus komorebi workspace", error);
+                }
+            }
+
+            async function refreshKomorebiState() {
+                try {
+                    const result = await runKomorebicCommand("state");
+                    const komorebiOutput = parseKomorebiStateOutput(
+                        result.stdout,
+                    );
+
+                    if (!komorebiOutput) {
+                        return;
+                    }
+
+                    state.latestKomorebiOutput = komorebiOutput;
+                    renderKomorebi(komorebiOutput);
+                } catch (error) {
+                    console.error("Failed to refresh komorebi state", error);
+                }
+            }
+
+            function renderKomorebi(komorebiOutput) {
+                clearElement(elements.workspaces);
+                const items = getKomorebiWorkspaceItems(komorebiOutput);
+
+                if (!items.length) {
+                    toggleHidden(elements.workspaces, true);
+                    return;
+                }
+
+                items.forEach((item) => {
+                    const button = document.createElement("button");
+                    const command = getKomorebiFocusWorkspaceCommand(
+                        komorebiOutput,
+                        item.index,
+                    );
+
+                    button.className = "pill workspace-pill interactive";
+                    button.type = "button";
+                    button.title = `Switch to workspace ${item.label}`;
+
+                    if (item.isActive) {
+                        button.classList.add("workspace-pill-active");
+                    }
+
+                    button.appendChild(
+                        textSpan("workspace-text", item.label),
+                    );
+                    button.addEventListener("click", () => {
+                        void focusKomorebiWorkspace(command);
+                    });
+                    elements.workspaces.appendChild(button);
+                });
+
+                toggleHidden(elements.workspaces, false);
+            }
+
             function renderSystray(systrayOutput) {
                 clearElement(elements.systray);
                 const { pinnedIcons, overflowIcons } =
@@ -872,7 +1325,12 @@
             }
 
             providers.onOutput((output) => {
+                if (output.komorebi) {
+                    state.latestKomorebiOutput = output.komorebi;
+                }
+
                 state.latestNetworkOutput = output.network;
+                renderKomorebi(output.komorebi ?? state.latestKomorebiOutput);
                 renderDate(output.date);
                 renderMedia(output.media);
                 renderSystray(output.systray);
@@ -882,9 +1340,17 @@
                 renderBattery(output.battery);
             });
 
-            providers.onError((error) => {
-                console.error("Zebar provider error", error);
+            providers.onError((errorMap) => {
+                if (errorMap?.komorebi) {
+                    state.latestKomorebiOutput = null;
+                    renderKomorebi(null);
+                    void refreshKomorebiState();
+                }
+
+                console.error("Zebar provider error", errorMap);
             });
+
+            void refreshKomorebiState();
         </script>
     </body>
 </html>
