@@ -17,6 +17,10 @@
       "privileges": {
         "shellCommands": [
           {
+            "program": "netsh.exe",
+            "argsRegex": "^mbn show interfaces$"
+          },
+          {
             "program": "explorer.exe",
             "argsRegex": "^(ms-availablenetworks:|ms-settings:network)$"
           }
