@@ -234,6 +234,7 @@
             const MEDIA_TEXT_LIMIT = 28;
             const VOLUME_STEP = 5;
             const CELLULAR_SIGNAL_REFRESH_INTERVAL = 5000;
+            const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
             const QUICK_SETTINGS_POPUP_WIDTH = 420;
             const QUICK_SETTINGS_POPUP_HEIGHT = 384;
             const KOMOREBIC_PROGRAM_CANDIDATES = [
@@ -268,6 +269,10 @@
             });
             const state = {
                 latestKomorebiOutput: null,
+                komorebiLastRefreshAt: 0,
+                komorebiRefreshRequest: null,
+                komorebiRefreshSequence: 0,
+                komorebiAppliedRefreshSequence: 0,
                 latestNetworkOutput: null,
                 cellularSignalStrength: null,
                 cellularSignalUpdatedAt: 0,
@@ -769,6 +774,39 @@
                     : `focus-monitor-workspace ${monitorIndex} ${workspaceIndex}`;
             }
 
+            function shouldRefreshKomorebiState({
+                now = Date.now(),
+                lastRefreshAt = 0,
+                refreshRequest = null,
+                refreshInterval = KOMOREBI_STATE_REFRESH_INTERVAL,
+            } = {}) {
+                if (refreshRequest) {
+                    return false;
+                }
+
+                return now - lastRefreshAt >= refreshInterval;
+            }
+
+            function syncKomorebiState({
+                currentState = state,
+                refreshState = refreshKomorebiState,
+                now = Date.now(),
+                refreshInterval = KOMOREBI_STATE_REFRESH_INTERVAL,
+            } = {}) {
+                if (
+                    !shouldRefreshKomorebiState({
+                        now,
+                        lastRefreshAt: currentState.komorebiLastRefreshAt,
+                        refreshRequest: currentState.komorebiRefreshRequest,
+                        refreshInterval,
+                    })
+                ) {
+                    return currentState.komorebiRefreshRequest;
+                }
+
+                return refreshState();
+            }
+
             function getNetworkState(networkOutput, options = {}) {
                 const defaultInterface =
                     networkOutput?.defaultInterface ?? null;
@@ -1153,28 +1191,51 @@
 
                 try {
                     await runCommand(command);
-                    await refreshState();
+                    await refreshState({ force: true });
                 } catch (error) {
                     console.error("Failed to focus komorebi workspace", error);
                 }
             }
 
-            async function refreshKomorebiState() {
-                try {
-                    const result = await runKomorebicCommand("state");
-                    const komorebiOutput = parseKomorebiStateOutput(
-                        result.stdout,
-                    );
-
-                    if (!komorebiOutput) {
-                        return;
-                    }
-
-                    state.latestKomorebiOutput = komorebiOutput;
-                    renderKomorebi(komorebiOutput);
-                } catch (error) {
-                    console.error("Failed to refresh komorebi state", error);
+            async function refreshKomorebiState({ force = false } = {}) {
+                if (!force && state.komorebiRefreshRequest) {
+                    return state.komorebiRefreshRequest;
                 }
+
+                const refreshSequence = ++state.komorebiRefreshSequence;
+                const request = (async () => {
+                    try {
+                        const result = await runKomorebicCommand("state");
+                        const komorebiOutput = parseKomorebiStateOutput(
+                            result.stdout,
+                        );
+
+                        if (!komorebiOutput) {
+                            return;
+                        }
+
+                        if (
+                            refreshSequence <
+                            state.komorebiAppliedRefreshSequence
+                        ) {
+                            return;
+                        }
+
+                        state.komorebiAppliedRefreshSequence = refreshSequence;
+                        state.latestKomorebiOutput = komorebiOutput;
+                        state.komorebiLastRefreshAt = Date.now();
+                        renderKomorebi(komorebiOutput);
+                    } catch (error) {
+                        console.error("Failed to refresh komorebi state", error);
+                    } finally {
+                        if (state.komorebiRefreshRequest === request) {
+                            state.komorebiRefreshRequest = null;
+                        }
+                    }
+                })();
+
+                state.komorebiRefreshRequest = request;
+                return request;
             }
 
             function renderKomorebi(komorebiOutput) {
@@ -1338,6 +1399,7 @@
                 refreshCellularSignalStrength(output.network);
                 renderAudio(output.audio);
                 renderBattery(output.battery);
+                void syncKomorebiState();
             });
 
             providers.onError((errorMap) => {
