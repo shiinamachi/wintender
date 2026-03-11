@@ -18,13 +18,13 @@ Since this is a project primarily for personal use, issues that are reported may
 - Customizable
 
 ## Screenshots
-![Top Bar](./images/preview_1.png)
+![Top Bar](https://raw.githubusercontent.com/shiinamachi/wintender/main/images/preview_1.png)
 
-![Settings Screen](./images/preview_2.png)
+![Settings Screen](https://raw.githubusercontent.com/shiinamachi/wintender/main/images/preview_2.png)
 
-![Settings Screen](./images/preview_3.png)
+![Settings Screen](https://raw.githubusercontent.com/shiinamachi/wintender/main/images/preview_3.png)
 
-![Settings Screen](./images/preview_4.png)
+![Settings Screen](https://raw.githubusercontent.com/shiinamachi/wintender/main/images/preview_4.png)
 
 ## License
 
