@@ -1,4 +1,4 @@
-# zebar-wintender
+# wintender
 
 Zebar Widgets Pack for Windows 11
 
