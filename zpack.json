@@ -21,6 +21,10 @@
             "resizable": false,
             "transparent": true,
             "includeFiles": ["*.html", "resources/*"],
+            "caching": {
+                "defaultDuration": 604800,
+                "rules": []
+            },
             "privileges": {
                 "shellCommands": [
                     {
@@ -86,6 +90,13 @@
             "resizable": false,
             "transparent": true,
             "includeFiles": ["*.html", "resources/*"],
+            "caching": {
+                "defaultDuration": 604800,
+                "rules": []
+            },
+            "privileges": {
+                "shellCommands": []
+            },
             "presets": [
                 {
                     "name": "default",
@@ -115,6 +126,10 @@
             "resizable": false,
             "transparent": true,
             "includeFiles": ["*.html", "resources/*"],
+            "caching": {
+                "defaultDuration": 604800,
+                "rules": []
+            },
             "privileges": {
                 "shellCommands": [
                     {
@@ -160,6 +175,13 @@
             "resizable": false,
             "transparent": true,
             "includeFiles": ["*.html", "resources/*"],
+            "caching": {
+                "defaultDuration": 604800,
+                "rules": []
+            },
+            "privileges": {
+                "shellCommands": []
+            },
             "presets": [
                 {
                     "name": "default",
