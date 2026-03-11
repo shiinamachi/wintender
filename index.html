@@ -235,8 +235,6 @@
             const VOLUME_STEP = 5;
             const CELLULAR_SIGNAL_REFRESH_INTERVAL = 5000;
             const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
-            const QUICK_SETTINGS_POPUP_WIDTH = 420;
-            const QUICK_SETTINGS_POPUP_HEIGHT = 384;
             const KOMOREBIC_PROGRAM_CANDIDATES = [
                 "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
                 "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
@@ -935,6 +933,24 @@
                 return signalStrength;
             }
 
+            function getNetworkFlyoutTargets() {
+                return ["ms-availablenetworks:", "ms-settings:network"];
+            }
+
+            async function openNetworkFlyout() {
+                for (const target of getNetworkFlyoutTargets()) {
+                    try {
+                        await zebar.shellSpawn("explorer.exe", [target]);
+                        return;
+                    } catch (error) {
+                        console.error(
+                            `Failed to open network target: ${target}`,
+                            error,
+                        );
+                    }
+                }
+            }
+
             function getAudioState(audioOutput) {
                 const device = audioOutput?.defaultPlaybackDevice ?? null;
 
@@ -1067,52 +1083,6 @@
                         error,
                     );
                     await zebar.startWidgetPreset("tray-popup", "default", {
-                        packId: current.packId,
-                    });
-                }
-            }
-
-            async function openQuickSettings(event) {
-                const button = event?.currentTarget;
-
-                if (!(button instanceof HTMLElement)) {
-                    return;
-                }
-
-                const current = zebar.currentWidget();
-                const anchorRect = button.getBoundingClientRect();
-                const popupWidth = QUICK_SETTINGS_POPUP_WIDTH;
-                const popupHeight = QUICK_SETTINGS_POPUP_HEIGHT;
-                const offsetX = Math.max(
-                    8,
-                    Math.round(anchorRect.right - popupWidth),
-                );
-                const offsetY = Math.max(36, Math.round(anchorRect.bottom + 8));
-
-                try {
-                    await zebar.startWidget(
-                        "quick-settings",
-                        {
-                            anchor: "top_left",
-                            offsetX: `${offsetX}px`,
-                            offsetY: `${offsetY}px`,
-                            width: `${popupWidth}px`,
-                            height: `${popupHeight}px`,
-                            monitorSelection: { type: "primary" },
-                            dockToEdge: {
-                                enabled: false,
-                                edge: null,
-                                windowMargin: "0px",
-                            },
-                        },
-                        { packId: current.packId },
-                    );
-                } catch (error) {
-                    console.error(
-                        "Dynamic quick settings launch failed, falling back to preset",
-                        error,
-                    );
-                    await zebar.startWidgetPreset("quick-settings", "default", {
                         packId: current.packId,
                     });
                 }
@@ -1327,8 +1297,8 @@
                 elements.network.appendChild(
                     textSpan("network-text", networkState.text),
                 );
-                elements.network.onclick = (event) => {
-                    void openQuickSettings(event);
+                elements.network.onclick = () => {
+                    void openNetworkFlyout();
                 };
                 toggleHidden(elements.network, false);
             }
