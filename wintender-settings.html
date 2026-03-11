@@ -582,6 +582,49 @@
                 return typeof text === "string" ? text.trim() : "";
             }
 
+            function resolvePreferredLocale(locale) {
+                const explicitLocale = normalizeText(locale);
+
+                if (explicitLocale) {
+                    return explicitLocale;
+                }
+
+                const navigatorLocaleList = Array.isArray(
+                    globalThis.navigator?.languages,
+                )
+                    ? globalThis.navigator.languages
+                    : [];
+                const preferredNavigatorLocale = navigatorLocaleList
+                    .map((entry) => normalizeText(entry))
+                    .find(Boolean);
+
+                if (preferredNavigatorLocale) {
+                    return preferredNavigatorLocale;
+                }
+
+                const navigatorLocale = normalizeText(
+                    globalThis.navigator?.language,
+                );
+
+                if (navigatorLocale) {
+                    return navigatorLocale;
+                }
+
+                try {
+                    const intlLocale = normalizeText(
+                        new Intl.DateTimeFormat().resolvedOptions().locale,
+                    );
+
+                    if (intlLocale) {
+                        return intlLocale;
+                    }
+                } catch (error) {
+                    console.error("Failed to resolve preferred locale", error);
+                }
+
+                return "ko-KR";
+            }
+
             function getDefaultUserSettings() {
                 return { ...DEFAULT_USER_SETTINGS };
             }
@@ -680,10 +723,12 @@
                 return String(value).padStart(length, "0");
             }
 
-            function getDayPeriodText(date, locale = "ko-KR") {
+            function getDayPeriodText(date, locale) {
+                const effectiveLocale = resolvePreferredLocale(locale);
+
                 try {
                     return (
-                        new Intl.DateTimeFormat(locale, {
+                        new Intl.DateTimeFormat(effectiveLocale, {
                             hour: "numeric",
                             hour12: true,
                         })
@@ -696,11 +741,7 @@
                 }
             }
 
-            function formatClockText(
-                now,
-                format,
-                locale = "ko-KR",
-            ) {
+            function formatClockText(now, format, locale) {
                 const date = now instanceof Date ? now : new Date(now);
 
                 if (
@@ -711,6 +752,7 @@
                     return "--";
                 }
 
+                const effectiveLocale = resolvePreferredLocale(locale);
                 const hours24 = date.getHours();
                 const hours12 = hours24 % 12 || 12;
                 const tokenValues = {
@@ -720,10 +762,10 @@
                     M: String(date.getMonth() + 1),
                     dd: padNumber(date.getDate(), 2),
                     d: String(date.getDate()),
-                    ddd: date.toLocaleDateString(locale, {
+                    ddd: date.toLocaleDateString(effectiveLocale, {
                         weekday: "short",
                     }),
-                    dddd: date.toLocaleDateString(locale, {
+                    dddd: date.toLocaleDateString(effectiveLocale, {
                         weekday: "long",
                     }),
                     HH: padNumber(hours24, 2),
@@ -734,7 +776,7 @@
                     m: String(date.getMinutes()),
                     ss: padNumber(date.getSeconds(), 2),
                     s: String(date.getSeconds()),
-                    tt: getDayPeriodText(date, locale),
+                    tt: getDayPeriodText(date, effectiveLocale),
                 };
 
                 return format.replace(
@@ -750,12 +792,13 @@
                     return "--";
                 }
 
-                const datePart = date.toLocaleDateString("ko-KR", {
+                const preferredLocale = resolvePreferredLocale();
+                const datePart = date.toLocaleDateString(preferredLocale, {
                     month: "long",
                     day: "numeric",
                     weekday: "short",
                 });
-                const timePart = date.toLocaleTimeString("ko-KR", {
+                const timePart = date.toLocaleTimeString(preferredLocale, {
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: true,
