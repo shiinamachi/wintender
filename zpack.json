@@ -149,6 +149,35 @@
         "network",
         "audio"
       ]
+    },
+    {
+      "name": "wintender-settings",
+      "htmlPath": "./wintender-settings.html",
+      "zOrder": "top_most",
+      "shownInTaskbar": false,
+      "focused": true,
+      "resizable": false,
+      "transparent": true,
+      "includeFiles": ["*.html", "resources/*"],
+      "presets": [
+        {
+          "name": "default",
+          "anchor": "top_right",
+          "offsetX": "0px",
+          "offsetY": "40px",
+          "width": "420px",
+          "height": "420px",
+          "monitorSelection": {
+            "type": "primary"
+          },
+          "dockToEdge": {
+            "enabled": false,
+            "edge": null,
+            "windowMargin": "0px"
+          }
+        }
+      ],
+      "providers": []
     }
   ]
 }

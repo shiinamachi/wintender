@@ -280,9 +280,10 @@
             const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
             const QUICK_SETTINGS_POPUP_WIDTH = 420;
             const QUICK_SETTINGS_POPUP_HEIGHT = 580;
+            const WINTENDER_SETTINGS_WIDTH = 420;
+            const WINTENDER_SETTINGS_HEIGHT = 420;
             const TOP_BAR_HEIGHT = 32;
             const TOP_BAR_CONTEXT_MENU_WIDTH = 172;
-            const TOP_BAR_CONTEXT_MENU_HEIGHT = 96;
             const TOP_BAR_CONTEXT_MENU_MARGIN = 8;
             const ZEBAR_SETTINGS_WINDOW_TIMEOUT_MS = 1500;
             const ZEBAR_TRAY_TOOLTIP_PREFIX = "Zebar v";
@@ -291,16 +292,24 @@
             const ZEBAR_SETTINGS_WINDOW_TITLE = "Settings - Zebar";
             const ZEBAR_SETTINGS_WINDOW_WIDTH = 900;
             const ZEBAR_SETTINGS_WINDOW_HEIGHT = 600;
+            const WINTENDER_SETTINGS_STORAGE_KEY = "wintender:settings";
+            const WINTENDER_SETTINGS_CHANNEL_NAME = "wintender-settings";
             const KOMOREBIC_PROGRAM_CANDIDATES = [
                 "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
                 "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
                 "komorebic.exe",
             ];
-            const PINNED_TRAY_TOOLTIPS = [
-                "Windows Security",
-                "AutoHotkey",
-                "OneDrive",
-            ];
+            const DEFAULT_USER_SETTINGS = Object.freeze({
+                showKomorebiWorkspaces: true,
+                showSystray: true,
+                showNetwork: true,
+                showAudio: true,
+                showBattery: true,
+                clockFormat: "",
+                pinnedTrayTooltips: [],
+            });
+            const CLOCK_TOKEN_PATTERN =
+                /yyyy|dddd|ddd|yy|MM|M|dd|d|HH|H|hh|h|mm|m|ss|s|tt/g;
 
             const elements = {
                 workspaces: document.getElementById("workspaces"),
@@ -324,16 +333,23 @@
             });
             const state = {
                 latestKomorebiOutput: null,
+                latestDateOutput: null,
+                latestMediaOutput: null,
                 komorebiLastRefreshAt: 0,
                 komorebiRefreshRequest: null,
                 komorebiRefreshSequence: 0,
                 komorebiAppliedRefreshSequence: 0,
                 latestSystrayOutput: null,
                 latestNetworkOutput: null,
+                latestAudioOutput: null,
+                latestBatteryOutput: null,
                 cellularSignalStrength: null,
                 cellularSignalUpdatedAt: 0,
                 cellularSignalRequest: null,
                 topBarContextMenuOpen: false,
+                userSettings: { ...DEFAULT_USER_SETTINGS },
+                userSettingsStorageRaw: null,
+                userSettingsChannel: null,
             };
 
             function clamp(value, min, max) {
@@ -376,6 +392,268 @@
 
             function normalizeText(text) {
                 return typeof text === "string" ? text.trim() : "";
+            }
+
+            function getDefaultUserSettings() {
+                return { ...DEFAULT_USER_SETTINGS };
+            }
+
+            function mergeUserSettings(rawSettings) {
+                const settings = getDefaultUserSettings();
+
+                if (!rawSettings || typeof rawSettings !== "object") {
+                    return settings;
+                }
+
+                if (typeof rawSettings.showKomorebiWorkspaces === "boolean") {
+                    settings.showKomorebiWorkspaces =
+                        rawSettings.showKomorebiWorkspaces;
+                }
+
+                if (typeof rawSettings.showSystray === "boolean") {
+                    settings.showSystray = rawSettings.showSystray;
+                }
+
+                if (typeof rawSettings.showNetwork === "boolean") {
+                    settings.showNetwork = rawSettings.showNetwork;
+                }
+
+                if (typeof rawSettings.showAudio === "boolean") {
+                    settings.showAudio = rawSettings.showAudio;
+                }
+
+                if (typeof rawSettings.showBattery === "boolean") {
+                    settings.showBattery = rawSettings.showBattery;
+                }
+
+                if (typeof rawSettings.clockFormat === "string") {
+                    settings.clockFormat = normalizeText(rawSettings.clockFormat);
+                }
+
+                if (Array.isArray(rawSettings.pinnedTrayTooltips)) {
+                    settings.pinnedTrayTooltips = rawSettings.pinnedTrayTooltips
+                        .map((value) => normalizeText(value))
+                        .filter(Boolean);
+                }
+
+                return settings;
+            }
+
+            function safeJsonParse(text) {
+                if (typeof text !== "string" || !text.trim()) {
+                    return null;
+                }
+
+                try {
+                    return JSON.parse(text);
+                } catch (error) {
+                    console.error("Failed to parse wintender settings", error);
+                    return null;
+                }
+            }
+
+            function readStoredUserSettings(
+                storage = globalThis.localStorage,
+            ) {
+                if (typeof storage?.getItem !== "function") {
+                    return {
+                        raw: null,
+                        settings: getDefaultUserSettings(),
+                    };
+                }
+
+                const raw = storage.getItem(WINTENDER_SETTINGS_STORAGE_KEY);
+
+                if (typeof raw !== "string" || !raw.trim()) {
+                    return {
+                        raw: null,
+                        settings: getDefaultUserSettings(),
+                    };
+                }
+
+                return {
+                    raw,
+                    settings: mergeUserSettings(safeJsonParse(raw)),
+                };
+            }
+
+            function padNumber(value, length = 2) {
+                return String(value).padStart(length, "0");
+            }
+
+            function getDayPeriodText(date, locale = "ko-KR") {
+                try {
+                    return (
+                        new Intl.DateTimeFormat(locale, {
+                            hour: "numeric",
+                            hour12: true,
+                        })
+                            .formatToParts(date)
+                            .find((part) => part.type === "dayPeriod")?.value ??
+                        (date.getHours() < 12 ? "AM" : "PM")
+                    );
+                } catch (error) {
+                    return date.getHours() < 12 ? "AM" : "PM";
+                }
+            }
+
+            function formatClockText(
+                now,
+                format,
+                locale = "ko-KR",
+            ) {
+                const date = now instanceof Date ? now : new Date(now);
+
+                if (
+                    !(date instanceof Date) ||
+                    Number.isNaN(date.getTime()) ||
+                    !normalizeText(format)
+                ) {
+                    return "--";
+                }
+
+                const hours24 = date.getHours();
+                const hours12 = hours24 % 12 || 12;
+                const tokenValues = {
+                    yyyy: padNumber(date.getFullYear(), 4),
+                    yy: padNumber(date.getFullYear() % 100, 2),
+                    MM: padNumber(date.getMonth() + 1, 2),
+                    M: String(date.getMonth() + 1),
+                    dd: padNumber(date.getDate(), 2),
+                    d: String(date.getDate()),
+                    ddd: date.toLocaleDateString(locale, {
+                        weekday: "short",
+                    }),
+                    dddd: date.toLocaleDateString(locale, {
+                        weekday: "long",
+                    }),
+                    HH: padNumber(hours24, 2),
+                    H: String(hours24),
+                    hh: padNumber(hours12, 2),
+                    h: String(hours12),
+                    mm: padNumber(date.getMinutes(), 2),
+                    m: String(date.getMinutes()),
+                    ss: padNumber(date.getSeconds(), 2),
+                    s: String(date.getSeconds()),
+                    tt: getDayPeriodText(date, locale),
+                };
+
+                return format.replace(
+                    CLOCK_TOKEN_PATTERN,
+                    (token) => tokenValues[token] ?? token,
+                );
+            }
+
+            function formatDate(now) {
+                if (!now) {
+                    return "--";
+                }
+
+                const customFormat = normalizeText(state.userSettings.clockFormat);
+
+                if (customFormat) {
+                    return formatClockText(now, customFormat);
+                }
+
+                const date = new Date(now);
+
+                const datePart = date.toLocaleDateString("ko-KR", {
+                    month: "long",
+                    day: "numeric",
+                    weekday: "short",
+                });
+                const timePart = date.toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                });
+
+                return `${datePart} ${timePart}`;
+            }
+
+            function renderAllCurrentState() {
+                renderKomorebi(state.latestKomorebiOutput);
+                renderDate(state.latestDateOutput);
+                renderMedia(state.latestMediaOutput);
+                renderSystray(state.latestSystrayOutput);
+                renderNetwork(state.latestNetworkOutput);
+                renderAudio(state.latestAudioOutput);
+                renderBattery(state.latestBatteryOutput);
+            }
+
+            function applyUserSettings(
+                rawSettings,
+                {
+                    raw = null,
+                    rerender = true,
+                } = {},
+            ) {
+                state.userSettings = mergeUserSettings(rawSettings);
+                state.userSettingsStorageRaw = raw;
+
+                if (rerender) {
+                    renderAllCurrentState();
+                }
+
+                return state.userSettings;
+            }
+
+            function setUserSettings(nextSettings, options = {}) {
+                return applyUserSettings(nextSettings, options);
+            }
+
+            function syncUserSettingsFromStorage({
+                storage = globalThis.localStorage,
+                rerender = true,
+            } = {}) {
+                const { raw, settings } = readStoredUserSettings(storage);
+
+                if (raw === state.userSettingsStorageRaw) {
+                    return state.userSettings;
+                }
+
+                return applyUserSettings(settings, { raw, rerender });
+            }
+
+            function initializeUserSettings() {
+                const { raw, settings } = readStoredUserSettings();
+                applyUserSettings(settings, {
+                    raw,
+                    rerender: false,
+                });
+            }
+
+            function setupUserSettingsSync() {
+                if (typeof BroadcastChannel === "function") {
+                    try {
+                        const channel = new BroadcastChannel(
+                            WINTENDER_SETTINGS_CHANNEL_NAME,
+                        );
+
+                        channel.addEventListener("message", () => {
+                            syncUserSettingsFromStorage();
+                        });
+                        state.userSettingsChannel = channel;
+                    } catch (error) {
+                        console.error(
+                            "Failed to initialize wintender settings channel",
+                            error,
+                        );
+                    }
+                }
+
+                if (typeof window?.addEventListener === "function") {
+                    window.addEventListener("storage", (event) => {
+                        if (
+                            event?.key &&
+                            event.key !== WINTENDER_SETTINGS_STORAGE_KEY
+                        ) {
+                            return;
+                        }
+
+                        syncUserSettingsFromStorage();
+                    });
+                }
             }
 
             function getSignalStrengthValue(...candidates) {
@@ -442,27 +720,6 @@
 
                 const match = output.match(/^\s*Signal\s*:\s*(\d+)%\s*$/im);
                 return match ? clamp(Number(match[1]), 0, 100) : null;
-            }
-
-            function formatDate(now) {
-                if (!now) {
-                    return "--";
-                }
-
-                const date = new Date(now);
-
-                const datePart = date.toLocaleDateString("ko-KR", {
-                    month: "long",
-                    day: "numeric",
-                    weekday: "short",
-                });
-                const timePart = date.toLocaleTimeString("ko-KR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                });
-
-                return `${datePart} ${timePart}`;
             }
 
             function getMediaState(mediaOutput) {
@@ -1072,7 +1329,9 @@
 
             function isPinnedTrayIcon(icon) {
                 const tooltip = normalizeText(icon?.tooltip);
-                return tooltip ? PINNED_TRAY_TOOLTIPS.includes(tooltip) : false;
+                return tooltip
+                    ? state.userSettings.pinnedTrayTooltips.includes(tooltip)
+                    : false;
             }
 
             function getTrayGroups(systrayOutput) {
@@ -1237,6 +1496,13 @@
                 );
                 menu.appendChild(
                     createTopBarContextMenuItem({
+                        action: "wintender-settings",
+                        icon: "󰒓",
+                        label: "Wintender Settings",
+                    }),
+                );
+                menu.appendChild(
+                    createTopBarContextMenuItem({
                         action: "zebar-settings",
                         icon: "󰒓",
                         label: "Zebar Settings",
@@ -1322,9 +1588,16 @@
                         ? window.innerWidth
                         : TOP_BAR_CONTEXT_MENU_WIDTH +
                           TOP_BAR_CONTEXT_MENU_MARGIN * 2;
+                const contextMenuHeight =
+                    Math.max(
+                        1,
+                        elements.topBarContextMenu?.children?.length ?? 0,
+                    ) *
+                        34 +
+                    12;
                 const height = expanded
                     ? TOP_BAR_HEIGHT +
-                      TOP_BAR_CONTEXT_MENU_HEIGHT +
+                      contextMenuHeight +
                       TOP_BAR_CONTEXT_MENU_MARGIN * 2
                     : TOP_BAR_HEIGHT;
 
@@ -1421,6 +1694,46 @@
                 }
             }
 
+            function getWintenderSettingsPlacement() {
+                return {
+                    anchor: "top_right",
+                    offsetX: "0px",
+                    offsetY: "40px",
+                    width: `${WINTENDER_SETTINGS_WIDTH}px`,
+                    height: `${WINTENDER_SETTINGS_HEIGHT}px`,
+                    monitorSelection: { type: "primary" },
+                    dockToEdge: {
+                        enabled: false,
+                        edge: null,
+                        windowMargin: "0px",
+                    },
+                };
+            }
+
+            async function openWintenderSettings() {
+                const current = zebar.currentWidget();
+
+                try {
+                    await zebar.startWidget(
+                        "wintender-settings",
+                        getWintenderSettingsPlacement(),
+                        { packId: current.packId },
+                    );
+                } catch (error) {
+                    console.error(
+                        "Dynamic wintender settings launch failed, falling back to preset",
+                        error,
+                    );
+                    await zebar.startWidgetPreset(
+                        "wintender-settings",
+                        "default",
+                        {
+                            packId: current.packId,
+                        },
+                    );
+                }
+            }
+
             async function openZebarSettings({
                 getZebarSystrayIcon: getZebarTrayIcon = getZebarSystrayIcon,
                 systrayOutput = state.latestSystrayOutput,
@@ -1479,6 +1792,8 @@
                 action,
                 {
                     openTaskManager: taskManagerOpener = openTaskManager,
+                    openWintenderSettings: wintenderSettingsOpener =
+                        openWintenderSettings,
                     openZebarSettings: zebarSettingsOpener =
                         openZebarSettings,
                 } = {},
@@ -1487,6 +1802,11 @@
 
                 if (action === "task-manager") {
                     await taskManagerOpener();
+                    return;
+                }
+
+                if (action === "wintender-settings") {
+                    await wintenderSettingsOpener();
                     return;
                 }
 
@@ -1663,6 +1983,12 @@
 
             function renderKomorebi(komorebiOutput) {
                 clearElement(elements.workspaces);
+
+                if (!state.userSettings.showKomorebiWorkspaces) {
+                    toggleHidden(elements.workspaces, true);
+                    return;
+                }
+
                 const items = getKomorebiWorkspaceItems(komorebiOutput);
 
                 if (!items.length) {
@@ -1699,6 +2025,13 @@
 
             function renderSystray(systrayOutput) {
                 clearElement(elements.systray);
+
+                if (!state.userSettings.showSystray) {
+                    closeTrayOverflow();
+                    toggleHidden(elements.systray, true);
+                    return;
+                }
+
                 const { pinnedIcons, overflowIcons } =
                     getTrayGroups(systrayOutput);
                 const icons = systrayOutput?.icons ?? [];
@@ -1708,12 +2041,6 @@
                     toggleHidden(elements.systray, true);
                     return;
                 }
-
-                pinnedIcons.forEach((icon) => {
-                    elements.systray.appendChild(
-                        buildTrayButton(icon, systrayOutput),
-                    );
-                });
 
                 if (overflowIcons.length) {
                     const overflow = document.createElement("div");
@@ -1736,6 +2063,12 @@
                 } else {
                     closeTrayOverflow();
                 }
+
+                pinnedIcons.forEach((icon) => {
+                    elements.systray.appendChild(
+                        buildTrayButton(icon, systrayOutput),
+                    );
+                });
 
                 toggleHidden(elements.systray, false);
             }
@@ -1767,6 +2100,13 @@
             }
 
             function renderNetwork(networkOutput) {
+                if (!state.userSettings.showNetwork) {
+                    clearElement(elements.network);
+                    elements.network.onclick = null;
+                    toggleHidden(elements.network, true);
+                    return;
+                }
+
                 const networkState = getNetworkState(networkOutput, {
                     cellularSignalStrength: state.cellularSignalStrength,
                 });
@@ -1783,18 +2123,28 @@
             }
 
             function renderAudio(audioOutput) {
-                const state = getAudioState(audioOutput);
-                clearElement(elements.audio);
-                elements.audio.onwheel = null;
-                elements.audio.onclick = null;
-
-                if (!state) {
+                if (!state.userSettings.showAudio) {
+                    clearElement(elements.audio);
+                    elements.audio.onwheel = null;
+                    elements.audio.onclick = null;
                     toggleHidden(elements.audio, true);
                     return;
                 }
 
-                elements.audio.appendChild(iconSpan(state.icon));
-                elements.audio.appendChild(textSpan("audio-text", state.text));
+                const audioState = getAudioState(audioOutput);
+                clearElement(elements.audio);
+                elements.audio.onwheel = null;
+                elements.audio.onclick = null;
+
+                if (!audioState) {
+                    toggleHidden(elements.audio, true);
+                    return;
+                }
+
+                elements.audio.appendChild(iconSpan(audioState.icon));
+                elements.audio.appendChild(
+                    textSpan("audio-text", audioState.text),
+                );
                 elements.audio.onclick = (event) => {
                     void openQuickSettings(event);
                 };
@@ -1802,12 +2152,12 @@
                     event.preventDefault();
                     const direction = event.deltaY > 0 ? -1 : 1;
                     const nextVolume = clamp(
-                        state.volume + direction * VOLUME_STEP,
+                        audioState.volume + direction * VOLUME_STEP,
                         0,
                         100,
                     );
                     audioOutput.setVolume?.(nextVolume, {
-                        deviceId: state.deviceId,
+                        deviceId: audioState.deviceId,
                     });
                 };
 
@@ -1815,42 +2165,65 @@
             }
 
             function renderBattery(batteryOutput) {
-                const state = getBatteryState(batteryOutput);
-                clearElement(elements.battery);
-                elements.battery.onclick = null;
-                elements.battery.classList.toggle("warning", false);
-
-                if (!state) {
+                if (!state.userSettings.showBattery) {
+                    clearElement(elements.battery);
+                    elements.battery.onclick = null;
+                    elements.battery.classList.toggle("warning", false);
                     toggleHidden(elements.battery, true);
                     return;
                 }
 
-                elements.battery.appendChild(iconSpan(state.icon));
+                const batteryState = getBatteryState(batteryOutput);
+                clearElement(elements.battery);
+                elements.battery.onclick = null;
+                elements.battery.classList.toggle("warning", false);
+
+                if (!batteryState) {
+                    toggleHidden(elements.battery, true);
+                    return;
+                }
+
+                elements.battery.appendChild(iconSpan(batteryState.icon));
                 elements.battery.appendChild(
-                    textSpan("battery-text", state.text),
+                    textSpan("battery-text", batteryState.text),
                 );
                 elements.battery.onclick = (event) => {
                     void openQuickSettings(event);
                 };
-                elements.battery.classList.toggle("warning", state.isWarning);
+                elements.battery.classList.toggle(
+                    "warning",
+                    batteryState.isWarning,
+                );
                 toggleHidden(elements.battery, false);
             }
 
+            initializeUserSettings();
             setupTopBarContextMenu();
 
             const TEST_HOOKS = {
+                DEFAULT_USER_SETTINGS,
+                applyUserSettings,
                 elements,
                 closeTopBarContextMenu,
+                formatClockText,
                 getQuickSettingsPlacement,
+                getTrayGroups,
+                getWintenderSettingsPlacement,
+                getUserSettings: () => ({ ...state.userSettings }),
                 getZebarSystrayIcon,
                 openTaskManager,
                 openTopBarContextMenu,
+                openWintenderSettings,
                 openZebarSettings,
                 openQuickSettings,
+                renderDate,
+                renderSystray,
                 renderNetwork,
                 renderAudio,
                 renderBattery,
                 runTopBarContextMenuAction,
+                setUserSettings,
+                syncUserSettingsFromStorage,
                 shouldHandleTopBarContextMenu,
                 triggerZebarSystrayLeftClick,
             };
@@ -1858,21 +2231,21 @@
             if (globalThis.__WINTENDER_TOP_BAR_TEST_MODE__) {
                 globalThis.__WINTENDER_TOP_BAR_TEST_HOOKS__ = TEST_HOOKS;
             } else {
+                setupUserSettingsSync();
                 providers.onOutput((output) => {
                     if (output.komorebi) {
                         state.latestKomorebiOutput = output.komorebi;
                     }
 
+                    state.latestDateOutput = output.date;
+                    state.latestMediaOutput = output.media;
                     state.latestSystrayOutput = output.systray;
                     state.latestNetworkOutput = output.network;
-                    renderKomorebi(output.komorebi ?? state.latestKomorebiOutput);
-                    renderDate(output.date);
-                    renderMedia(output.media);
-                    renderSystray(output.systray);
-                    renderNetwork(output.network);
+                    state.latestAudioOutput = output.audio;
+                    state.latestBatteryOutput = output.battery;
+                    syncUserSettingsFromStorage({ rerender: false });
+                    renderAllCurrentState();
                     refreshCellularSignalStrength(output.network);
-                    renderAudio(output.audio);
-                    renderBattery(output.battery);
                     void syncKomorebiState();
                 });
 

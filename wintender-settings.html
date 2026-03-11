@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        />
+        <title>Wintender Settings</title>
+        <style>
+            :root {
+                --panel-bg: rgba(20, 20, 25, 0.9);
+                --panel-border: rgba(255, 255, 255, 0.08);
+                --panel-muted: #9a9aa4;
+                --panel-text: #e0e0e0;
+                --panel-accent: #89b4fa;
+                --panel-hover: rgba(255, 255, 255, 0.08);
+                --panel-input: rgba(255, 255, 255, 0.06);
+                --panel-preview: rgba(255, 255, 255, 0.04);
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            body {
+                font-family:
+                    "JetBrainsMonohangul NF Regular", "JetBrainsMono Nerd Font",
+                    "CaskaydiaCove Nerd Font", "Segoe UI", monospace;
+                font-size: 13px;
+                color: var(--panel-text);
+                background: transparent;
+            }
+
+            .shell {
+                height: 100%;
+                padding: 10px;
+                overflow: hidden;
+            }
+
+            .panel {
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+                height: 100%;
+                overflow-y: auto;
+                overflow-x: hidden;
+                padding: 18px;
+                border: 1px solid var(--panel-border);
+                border-radius: 18px;
+                background: var(--panel-bg);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+            }
+
+            .panel::-webkit-scrollbar {
+                width: 10px;
+            }
+
+            .panel::-webkit-scrollbar-thumb {
+                border: 2px solid transparent;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.18);
+                background-clip: padding-box;
+            }
+
+            .header {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .title {
+                font-size: 18px;
+                font-weight: 700;
+            }
+
+            .subtitle {
+                color: var(--panel-muted);
+                line-height: 1.5;
+            }
+
+            .section {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .section-label {
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: var(--panel-muted);
+            }
+
+            .setting-list {
+                display: grid;
+                gap: 10px;
+            }
+
+            .setting-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                padding: 12px 14px;
+                border: 1px solid var(--panel-border);
+                border-radius: 12px;
+                background: var(--panel-preview);
+            }
+
+            .setting-copy {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .setting-title {
+                font-weight: 600;
+            }
+
+            .setting-description {
+                color: var(--panel-muted);
+                line-height: 1.4;
+            }
+
+            .toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: flex-start;
+                position: relative;
+                flex: 0 0 auto;
+                width: 52px;
+                height: 30px;
+                cursor: pointer;
+            }
+
+            .toggle input {
+                position: absolute;
+                opacity: 0;
+                inset: 0;
+                cursor: pointer;
+            }
+
+            .toggle-track {
+                display: block;
+                width: 100%;
+                height: 100%;
+                border: 1px solid var(--panel-border);
+                border-radius: 999px;
+                background: var(--panel-preview);
+                transition:
+                    background 0.18s ease,
+                    border-color 0.18s ease,
+                    box-shadow 0.18s ease;
+            }
+
+            .toggle-thumb {
+                position: absolute;
+                top: 4px;
+                left: 4px;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #f3f5f8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+                transition:
+                    transform 0.18s ease,
+                    background 0.18s ease,
+                    border-color 0.18s ease;
+            }
+
+            .toggle:hover .toggle-track {
+                border-color: rgba(255, 255, 255, 0.12);
+                background: rgba(255, 255, 255, 0.06);
+            }
+
+            .toggle input:checked + .toggle-track {
+                background: var(--panel-accent);
+            }
+
+            .toggle input:focus-visible + .toggle-track {
+                box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+            }
+
+            .toggle input:checked + .toggle-track + .toggle-thumb {
+                transform: translateX(22px);
+                background: #ffffff;
+                border-color: rgba(137, 180, 250, 0.18);
+            }
+
+            .field {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .field input {
+                width: 100%;
+                height: 40px;
+                padding: 0 12px;
+                border: 1px solid var(--panel-border);
+                border-radius: 10px;
+                background: var(--panel-input);
+                color: var(--panel-text);
+                font: inherit;
+                outline: none;
+            }
+
+            .field input:focus {
+                border-color: rgba(137, 180, 250, 0.5);
+                box-shadow: 0 0 0 1px rgba(137, 180, 250, 0.24);
+            }
+
+            .field-hint {
+                color: var(--panel-muted);
+                line-height: 1.5;
+            }
+
+            .preview {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                padding: 12px 14px;
+                border: 1px solid var(--panel-border);
+                border-radius: 12px;
+                background: var(--panel-preview);
+            }
+
+            .preview-value {
+                color: var(--panel-accent);
+                font-size: 15px;
+                font-weight: 600;
+                line-height: 1.4;
+            }
+
+            .token-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .token {
+                padding: 4px 8px;
+                border-radius: 999px;
+                background: var(--panel-hover);
+                color: var(--panel-muted);
+                font-size: 12px;
+            }
+
+            .chip-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .chip-button,
+            .chip-static {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                min-height: 30px;
+                padding: 0 10px;
+                border: 1px solid var(--panel-border);
+                border-radius: 999px;
+                background: var(--panel-preview);
+                color: var(--panel-text);
+                font: inherit;
+            }
+
+            .chip-button {
+                cursor: pointer;
+                transition:
+                    background 0.18s ease,
+                    border-color 0.18s ease,
+                    color 0.18s ease;
+            }
+
+            .chip-button:hover {
+                background: var(--panel-hover);
+            }
+
+            .chip-button-active {
+                background: var(--panel-accent);
+                border-color: var(--panel-accent);
+                color: #11141b;
+            }
+
+            .chip-remove {
+                border: 0;
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                cursor: pointer;
+                opacity: 0.72;
+            }
+
+            .chip-remove:hover {
+                opacity: 1;
+            }
+
+            .field-row {
+                display: flex;
+                gap: 8px;
+            }
+
+            .field-row input {
+                flex: 1;
+            }
+
+            .action-button {
+                height: 40px;
+                padding: 0 14px;
+                border: 1px solid var(--panel-border);
+                border-radius: 10px;
+                background: var(--panel-preview);
+                color: var(--panel-text);
+                font: inherit;
+                cursor: pointer;
+                transition:
+                    background 0.18s ease,
+                    border-color 0.18s ease;
+            }
+
+            .action-button:hover {
+                background: var(--panel-hover);
+                border-color: rgba(255, 255, 255, 0.12);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="shell">
+            <main class="panel">
+                <header class="header">
+                    <h1 class="title">Wintender Settings</h1>
+                    <p class="subtitle">
+                        Control which top bar items are visible and update the
+                        center clock format. Changes are applied immediately.
+                    </p>
+                </header>
+
+                <section class="section">
+                    <h2 class="section-label">Visibility</h2>
+                    <div class="setting-list">
+                        <label class="setting-row">
+                            <div class="setting-copy">
+                                <span class="setting-title">
+                                    Komorebi Workspace
+                                </span>
+                                <span class="setting-description">
+                                    Show or hide the left workspace strip.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input
+                                    id="show-komorebi-workspaces"
+                                    type="checkbox"
+                                />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
+                                <span class="setting-title">Tray</span>
+                                <span class="setting-description">
+                                    Show pinned tray icons and the overflow
+                                    button.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-systray" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
+                                <span class="setting-title">Network</span>
+                                <span class="setting-description">
+                                    Show or hide the network pill on the right.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-network" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
+                                <span class="setting-title">Audio</span>
+                                <span class="setting-description">
+                                    Show or hide the audio pill on the right.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-audio" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
+                                <span class="setting-title">Battery</span>
+                                <span class="setting-description">
+                                    Show or hide the battery pill on the right.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-battery" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-label">Clock Format</h2>
+                    <label class="field">
+                        <input
+                            id="clock-format"
+                            type="text"
+                            placeholder="yyyy-MM-dd (ddd) HH:mm"
+                            spellcheck="false"
+                        />
+                        <span class="field-hint">
+                            Examples: `yyyy-MM-dd (ddd) HH:mm`,
+                            `MM/dd ddd tt hh:mm`
+                        </span>
+                    </label>
+
+                    <div class="preview">
+                        <span class="section-label">Preview</span>
+                        <strong id="clock-preview" class="preview-value">
+                            --
+                        </strong>
+                        <span class="field-hint">
+                            Leave this empty to use the default wintender clock
+                            layout.
+                        </span>
+                    </div>
+
+                    <div class="token-list">
+                        <span class="token">yyyy</span>
+                        <span class="token">yy</span>
+                        <span class="token">MM</span>
+                        <span class="token">dd</span>
+                        <span class="token">ddd</span>
+                        <span class="token">dddd</span>
+                        <span class="token">HH</span>
+                        <span class="token">hh</span>
+                        <span class="token">mm</span>
+                        <span class="token">ss</span>
+                        <span class="token">tt</span>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-label">Pinned Tray Icons</h2>
+                    <span class="field-hint">
+                        Pin tray icons to the top bar by selecting a detected
+                        tooltip or adding an exact-match tooltip manually.
+                    </span>
+
+                    <div class="preview">
+                        <span class="section-label">Detected tray icons</span>
+                        <div id="tray-pin-detected-list" class="chip-list"></div>
+                    </div>
+
+                    <label class="field">
+                        <span class="section-label">Manual exact-match entries</span>
+                        <div class="field-row">
+                            <input
+                                id="tray-pin-input"
+                                type="text"
+                                placeholder="Windows Security"
+                                spellcheck="false"
+                            />
+                            <button
+                                id="tray-pin-add"
+                                class="action-button"
+                                type="button"
+                            >
+                                Add
+                            </button>
+                        </div>
+                    </label>
+
+                    <div class="preview">
+                        <span class="section-label">Pinned exact matches</span>
+                        <div id="tray-pin-manual-list" class="chip-list"></div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <script type="module">
+            import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
+
+            const WINTENDER_SETTINGS_STORAGE_KEY = "wintender:settings";
+            const WINTENDER_SETTINGS_CHANNEL_NAME = "wintender-settings";
+            const DEFAULT_USER_SETTINGS = Object.freeze({
+                showKomorebiWorkspaces: true,
+                showSystray: true,
+                showNetwork: true,
+                showAudio: true,
+                showBattery: true,
+                clockFormat: "",
+                pinnedTrayTooltips: [],
+            });
+            const CLOCK_TOKEN_PATTERN =
+                /yyyy|dddd|ddd|yy|MM|M|dd|d|HH|H|hh|h|mm|m|ss|s|tt/g;
+            const PREVIEW_REFRESH_INTERVAL = 1000;
+            const widget = zebar.currentWidget();
+            const providers = zebar.createProviderGroup({
+                systray: { type: "systray" },
+            });
+
+            const elements = {
+                showKomorebiWorkspaces: document.getElementById(
+                    "show-komorebi-workspaces",
+                ),
+                showSystray: document.getElementById("show-systray"),
+                showNetwork: document.getElementById("show-network"),
+                showAudio: document.getElementById("show-audio"),
+                showBattery: document.getElementById("show-battery"),
+                clockFormat: document.getElementById("clock-format"),
+                clockPreview: document.getElementById("clock-preview"),
+                trayPinInput: document.getElementById("tray-pin-input"),
+                trayPinAdd: document.getElementById("tray-pin-add"),
+                trayPinManualList: document.getElementById(
+                    "tray-pin-manual-list",
+                ),
+                trayPinDetectedList: document.getElementById(
+                    "tray-pin-detected-list",
+                ),
+            };
+
+            const state = {
+                userSettings: { ...DEFAULT_USER_SETTINGS },
+                previewTimer: null,
+                channel: null,
+                detectedTrayTooltips: [],
+            };
+
+            function normalizeText(text) {
+                return typeof text === "string" ? text.trim() : "";
+            }
+
+            function getDefaultUserSettings() {
+                return { ...DEFAULT_USER_SETTINGS };
+            }
+
+            function mergeUserSettings(rawSettings) {
+                const settings = getDefaultUserSettings();
+
+                if (!rawSettings || typeof rawSettings !== "object") {
+                    return settings;
+                }
+
+                if (typeof rawSettings.showKomorebiWorkspaces === "boolean") {
+                    settings.showKomorebiWorkspaces =
+                        rawSettings.showKomorebiWorkspaces;
+                }
+
+                if (typeof rawSettings.showSystray === "boolean") {
+                    settings.showSystray = rawSettings.showSystray;
+                }
+
+                if (typeof rawSettings.showNetwork === "boolean") {
+                    settings.showNetwork = rawSettings.showNetwork;
+                }
+
+                if (typeof rawSettings.showAudio === "boolean") {
+                    settings.showAudio = rawSettings.showAudio;
+                }
+
+                if (typeof rawSettings.showBattery === "boolean") {
+                    settings.showBattery = rawSettings.showBattery;
+                }
+
+                if (typeof rawSettings.clockFormat === "string") {
+                    settings.clockFormat = normalizeText(rawSettings.clockFormat);
+                }
+
+                if (Array.isArray(rawSettings.pinnedTrayTooltips)) {
+                    settings.pinnedTrayTooltips = [...new Set(
+                        rawSettings.pinnedTrayTooltips
+                            .map((value) => normalizeText(value))
+                            .filter(Boolean),
+                    )];
+                }
+
+                return settings;
+            }
+
+            function clearElement(element) {
+                while (element?.firstChild) {
+                    element.removeChild(element.firstChild);
+                }
+            }
+
+            function safeJsonParse(text) {
+                if (typeof text !== "string" || !text.trim()) {
+                    return null;
+                }
+
+                try {
+                    return JSON.parse(text);
+                } catch (error) {
+                    console.error("Failed to parse wintender settings", error);
+                    return null;
+                }
+            }
+
+            function readStoredUserSettings(storage = globalThis.localStorage) {
+                if (typeof storage?.getItem !== "function") {
+                    return getDefaultUserSettings();
+                }
+
+                return mergeUserSettings(
+                    safeJsonParse(storage.getItem(WINTENDER_SETTINGS_STORAGE_KEY)),
+                );
+            }
+
+            function writeStoredUserSettings(
+                settings,
+                storage = globalThis.localStorage,
+            ) {
+                if (typeof storage?.setItem !== "function") {
+                    return;
+                }
+
+                storage.setItem(
+                    WINTENDER_SETTINGS_STORAGE_KEY,
+                    JSON.stringify(settings),
+                );
+            }
+
+            function padNumber(value, length = 2) {
+                return String(value).padStart(length, "0");
+            }
+
+            function getDayPeriodText(date, locale = "ko-KR") {
+                try {
+                    return (
+                        new Intl.DateTimeFormat(locale, {
+                            hour: "numeric",
+                            hour12: true,
+                        })
+                            .formatToParts(date)
+                            .find((part) => part.type === "dayPeriod")?.value ??
+                        (date.getHours() < 12 ? "AM" : "PM")
+                    );
+                } catch (error) {
+                    return date.getHours() < 12 ? "AM" : "PM";
+                }
+            }
+
+            function formatClockText(
+                now,
+                format,
+                locale = "ko-KR",
+            ) {
+                const date = now instanceof Date ? now : new Date(now);
+
+                if (
+                    !(date instanceof Date) ||
+                    Number.isNaN(date.getTime()) ||
+                    !normalizeText(format)
+                ) {
+                    return "--";
+                }
+
+                const hours24 = date.getHours();
+                const hours12 = hours24 % 12 || 12;
+                const tokenValues = {
+                    yyyy: padNumber(date.getFullYear(), 4),
+                    yy: padNumber(date.getFullYear() % 100, 2),
+                    MM: padNumber(date.getMonth() + 1, 2),
+                    M: String(date.getMonth() + 1),
+                    dd: padNumber(date.getDate(), 2),
+                    d: String(date.getDate()),
+                    ddd: date.toLocaleDateString(locale, {
+                        weekday: "short",
+                    }),
+                    dddd: date.toLocaleDateString(locale, {
+                        weekday: "long",
+                    }),
+                    HH: padNumber(hours24, 2),
+                    H: String(hours24),
+                    hh: padNumber(hours12, 2),
+                    h: String(hours12),
+                    mm: padNumber(date.getMinutes(), 2),
+                    m: String(date.getMinutes()),
+                    ss: padNumber(date.getSeconds(), 2),
+                    s: String(date.getSeconds()),
+                    tt: getDayPeriodText(date, locale),
+                };
+
+                return format.replace(
+                    CLOCK_TOKEN_PATTERN,
+                    (token) => tokenValues[token] ?? token,
+                );
+            }
+
+            function formatDefaultClockText(now) {
+                const date = now instanceof Date ? now : new Date(now);
+
+                if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+                    return "--";
+                }
+
+                const datePart = date.toLocaleDateString("ko-KR", {
+                    month: "long",
+                    day: "numeric",
+                    weekday: "short",
+                });
+                const timePart = date.toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                });
+
+                return `${datePart} ${timePart}`;
+            }
+
+            function getPreviewText(settings = state.userSettings) {
+                const customFormat = normalizeText(settings.clockFormat);
+                const now = new Date();
+
+                return customFormat
+                    ? formatClockText(now, customFormat)
+                    : formatDefaultClockText(now);
+            }
+
+            function renderPreview() {
+                elements.clockPreview.textContent = getPreviewText();
+            }
+
+            function renderPinnedTrayTooltips() {
+                clearElement(elements.trayPinDetectedList);
+                clearElement(elements.trayPinManualList);
+
+                const detected = state.detectedTrayTooltips;
+                const pinned = state.userSettings.pinnedTrayTooltips;
+
+                if (!detected.length) {
+                    const empty = document.createElement("span");
+                    empty.className = "chip-static";
+                    empty.textContent = "No tray tooltips detected yet.";
+                    elements.trayPinDetectedList.appendChild(empty);
+                } else {
+                    detected.forEach((tooltip) => {
+                        const button = document.createElement("button");
+                        const isActive = pinned.includes(tooltip);
+                        button.className = isActive
+                            ? "chip-button chip-button-active"
+                            : "chip-button";
+                        button.type = "button";
+                        button.textContent = tooltip;
+                        button.addEventListener("click", () => {
+                            togglePinnedTrayTooltip(tooltip);
+                        });
+                        elements.trayPinDetectedList.appendChild(button);
+                    });
+                }
+
+                if (!pinned.length) {
+                    const empty = document.createElement("span");
+                    empty.className = "chip-static";
+                    empty.textContent = "No pinned tray tooltips configured.";
+                    elements.trayPinManualList.appendChild(empty);
+                    return;
+                }
+
+                pinned.forEach((tooltip) => {
+                    const chip = document.createElement("span");
+                    const remove = document.createElement("button");
+
+                    chip.className = "chip-static";
+                    chip.appendChild(document.createTextNode(tooltip));
+
+                    remove.className = "chip-remove";
+                    remove.type = "button";
+                    remove.textContent = "x";
+                    remove.addEventListener("click", () => {
+                        removePinnedTrayTooltip(tooltip);
+                    });
+
+                    chip.appendChild(remove);
+                    elements.trayPinManualList.appendChild(chip);
+                });
+            }
+
+            function renderForm() {
+                elements.showKomorebiWorkspaces.checked =
+                    state.userSettings.showKomorebiWorkspaces;
+                elements.showSystray.checked = state.userSettings.showSystray;
+                elements.showNetwork.checked = state.userSettings.showNetwork;
+                elements.showAudio.checked = state.userSettings.showAudio;
+                elements.showBattery.checked = state.userSettings.showBattery;
+                elements.clockFormat.value = state.userSettings.clockFormat;
+                renderPreview();
+                renderPinnedTrayTooltips();
+            }
+
+            function collectFormSettings() {
+                return mergeUserSettings({
+                    showKomorebiWorkspaces:
+                        elements.showKomorebiWorkspaces.checked,
+                    showSystray: elements.showSystray.checked,
+                    showNetwork: elements.showNetwork.checked,
+                    showAudio: elements.showAudio.checked,
+                    showBattery: elements.showBattery.checked,
+                    clockFormat: elements.clockFormat.value,
+                    pinnedTrayTooltips: state.userSettings.pinnedTrayTooltips,
+                });
+            }
+
+            function persistPinnedTrayTooltips(nextTooltips) {
+                state.userSettings = mergeUserSettings({
+                    ...state.userSettings,
+                    pinnedTrayTooltips: nextTooltips,
+                });
+                writeStoredUserSettings(state.userSettings);
+                renderForm();
+                broadcastUserSettings();
+            }
+
+            function addPinnedTrayTooltip(rawValue) {
+                const tooltip = normalizeText(rawValue);
+
+                if (!tooltip) {
+                    return;
+                }
+
+                persistPinnedTrayTooltips([
+                    ...state.userSettings.pinnedTrayTooltips,
+                    tooltip,
+                ]);
+                elements.trayPinInput.value = "";
+            }
+
+            function removePinnedTrayTooltip(tooltip) {
+                persistPinnedTrayTooltips(
+                    state.userSettings.pinnedTrayTooltips.filter(
+                        (value) => value !== tooltip,
+                    ),
+                );
+            }
+
+            function togglePinnedTrayTooltip(tooltip) {
+                if (state.userSettings.pinnedTrayTooltips.includes(tooltip)) {
+                    removePinnedTrayTooltip(tooltip);
+                    return;
+                }
+
+                addPinnedTrayTooltip(tooltip);
+            }
+
+            function broadcastUserSettings(settings = state.userSettings) {
+                try {
+                    state.channel?.postMessage({
+                        type: "settings-changed",
+                        settings,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Failed to broadcast wintender settings",
+                        error,
+                    );
+                }
+            }
+
+            function persistUserSettings() {
+                state.userSettings = collectFormSettings();
+                writeStoredUserSettings(state.userSettings);
+                renderPreview();
+                broadcastUserSettings();
+            }
+
+            function loadUserSettings() {
+                state.userSettings = readStoredUserSettings();
+                writeStoredUserSettings(state.userSettings);
+                renderForm();
+            }
+
+            function setupChannel() {
+                if (typeof BroadcastChannel !== "function") {
+                    return;
+                }
+
+                try {
+                    state.channel = new BroadcastChannel(
+                        WINTENDER_SETTINGS_CHANNEL_NAME,
+                    );
+                    state.channel.addEventListener("message", () => {
+                        loadUserSettings();
+                    });
+                } catch (error) {
+                    console.error(
+                        "Failed to initialize wintender settings channel",
+                        error,
+                    );
+                }
+            }
+
+            function setupFormListeners() {
+                const toggleIds = [
+                    "showKomorebiWorkspaces",
+                    "showSystray",
+                    "showNetwork",
+                    "showAudio",
+                    "showBattery",
+                ];
+
+                toggleIds.forEach((key) => {
+                    elements[key].addEventListener("change", () => {
+                        persistUserSettings();
+                    });
+                });
+                elements.clockFormat.addEventListener("input", () => {
+                    persistUserSettings();
+                });
+                elements.trayPinAdd.addEventListener("click", () => {
+                    addPinnedTrayTooltip(elements.trayPinInput.value);
+                });
+                elements.trayPinInput.addEventListener("keydown", (event) => {
+                    if (event?.key === "Enter") {
+                        event.preventDefault();
+                        addPinnedTrayTooltip(elements.trayPinInput.value);
+                    }
+                });
+            }
+
+            function setupStorageListener() {
+                window.addEventListener("storage", (event) => {
+                    if (
+                        event?.key &&
+                        event.key !== WINTENDER_SETTINGS_STORAGE_KEY
+                    ) {
+                        return;
+                    }
+
+                    loadUserSettings();
+                });
+            }
+
+            function startPreviewTicker() {
+                state.previewTimer = setInterval(() => {
+                    renderPreview();
+                }, PREVIEW_REFRESH_INTERVAL);
+            }
+
+            function getDetectedTrayTooltips(systrayOutput) {
+                return [...new Set(
+                    (systrayOutput?.icons ?? [])
+                        .map((icon) => normalizeText(icon?.tooltip))
+                        .filter(Boolean),
+                )].sort((left, right) => left.localeCompare(right));
+            }
+
+            async function closeSettingsWindow() {
+                try {
+                    await widget?.close?.();
+                } catch (error) {
+                    console.error(
+                        "Failed to close wintender settings window",
+                        error,
+                    );
+                }
+            }
+
+            function setupCloseBehavior() {
+                widget?.tauriWindow?.listen?.("tauri://blur", () => {
+                    void closeSettingsWindow();
+                });
+
+                window.addEventListener("keydown", (event) => {
+                    if (event?.key === "Escape") {
+                        void closeSettingsWindow();
+                    }
+                });
+            }
+
+            function init() {
+                setupChannel();
+                setupCloseBehavior();
+                setupFormListeners();
+                setupStorageListener();
+                loadUserSettings();
+                startPreviewTicker();
+                providers.onOutput((output) => {
+                    state.detectedTrayTooltips = getDetectedTrayTooltips(
+                        output.systray,
+                    );
+                    renderPinnedTrayTooltips();
+                });
+            }
+
+            init();
+        </script>
+    </body>
+</html>

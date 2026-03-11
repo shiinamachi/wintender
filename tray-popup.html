@@ -87,19 +87,21 @@
     <script type="module">
       import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
 
-      const PINNED_TRAY_TOOLTIPS = [
-        "Windows Security",
-        "AutoHotkey",
-        "OneDrive",
-      ];
       const CONTEXT_MENU_BLUR_GRACE_MS = 400;
+      const WINTENDER_SETTINGS_STORAGE_KEY = "wintender:settings";
+      const DEFAULT_USER_SETTINGS = Object.freeze({
+        pinnedTrayTooltips: [],
+      });
 
       const popup = document.getElementById("popup");
       const widget = zebar.currentWidget();
       const providers = zebar.createProviderGroup({
         systray: { type: "systray" },
       });
-      let suppressBlurCloseUntil = 0;
+      const state = {
+        suppressBlurCloseUntil: 0,
+        userSettings: { ...DEFAULT_USER_SETTINGS },
+      };
 
       function clearElement(element) {
         while (element.firstChild) {
@@ -111,9 +113,63 @@
         return typeof text === "string" ? text.trim() : "";
       }
 
+      function mergeUserSettings(rawSettings) {
+        const settings = {
+          ...DEFAULT_USER_SETTINGS,
+        };
+
+        if (Array.isArray(rawSettings?.pinnedTrayTooltips)) {
+          settings.pinnedTrayTooltips = rawSettings.pinnedTrayTooltips
+            .map((value) => normalizeText(value))
+            .filter(Boolean);
+        }
+
+        return settings;
+      }
+
+      function safeJsonParse(text) {
+        if (typeof text !== "string" || !text.trim()) {
+          return null;
+        }
+
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          console.error("Failed to parse wintender settings", error);
+          return null;
+        }
+      }
+
+      function syncUserSettingsFromStorage(
+        storage = globalThis.localStorage,
+      ) {
+        if (typeof storage?.getItem !== "function") {
+          state.userSettings = mergeUserSettings(null);
+          return state.userSettings;
+        }
+
+        state.userSettings = mergeUserSettings(
+          safeJsonParse(storage.getItem(WINTENDER_SETTINGS_STORAGE_KEY)),
+        );
+        return state.userSettings;
+      }
+
+      function setUserSettings(nextSettings) {
+        state.userSettings = mergeUserSettings(nextSettings);
+        return state.userSettings;
+      }
+
       function isPinnedTrayIcon(icon) {
         const tooltip = normalizeText(icon?.tooltip);
-        return tooltip ? PINNED_TRAY_TOOLTIPS.includes(tooltip) : false;
+        return tooltip
+          ? state.userSettings.pinnedTrayTooltips.includes(tooltip)
+          : false;
+      }
+
+      function getVisibleOverflowIcons(systrayOutput) {
+        return (systrayOutput?.icons ?? []).filter(
+          (icon) => !isPinnedTrayIcon(icon),
+        );
       }
 
       function shouldClosePopupOnTrayInteraction(action) {
@@ -173,7 +229,7 @@
         button.addEventListener("contextmenu", async (event) => {
           event.preventDefault();
           event.stopPropagation();
-          suppressBlurCloseUntil = getBlurCloseSuppressionUntil();
+          state.suppressBlurCloseUntil = getBlurCloseSuppressionUntil();
           systrayOutput.onRightClick?.(icon.id);
 
           if (shouldClosePopupOnTrayInteraction("right")) {
@@ -184,8 +240,21 @@
         return button;
       }
 
+      const TEST_HOOKS = {
+        getVisibleOverflowIcons,
+        setUserSettings,
+        syncUserSettingsFromStorage,
+      };
+
+      if (globalThis.__WINTENDER_TRAY_POPUP_TEST_MODE__) {
+        globalThis.__WINTENDER_TRAY_POPUP_TEST_HOOKS__ = TEST_HOOKS;
+      } else {
+        syncUserSettingsFromStorage();
+      }
+
       providers.onOutput((output) => {
-        const icons = (output.systray?.icons ?? []).filter((icon) => !isPinnedTrayIcon(icon));
+        syncUserSettingsFromStorage();
+        const icons = getVisibleOverflowIcons(output.systray);
 
         clearElement(popup);
 
@@ -206,7 +275,7 @@
       });
 
       widget.tauriWindow.listen("tauri://blur", () => {
-        if (!shouldClosePopupOnBlur(suppressBlurCloseUntil)) {
+        if (!shouldClosePopupOnBlur(state.suppressBlurCloseUntil)) {
           return;
         }
 
