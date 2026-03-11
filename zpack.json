@@ -25,6 +25,10 @@
             "argsRegex": "^(ms-availablenetworks:|ms-settings:network)$"
           },
           {
+            "program": "taskmgr.exe",
+            "argsRegex": "^$"
+          },
+          {
             "program": "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
             "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
           },

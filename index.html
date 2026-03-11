@@ -23,11 +23,14 @@
 
             html,
             body {
-                height: 32px;
+                width: 100%;
+                height: 100%;
+                min-height: 32px;
                 overflow: hidden;
             }
 
             body {
+                position: relative;
                 font-family:
                     "JetBrainsMonohangul NF Regular", "JetBrainsMono Nerd Font",
                     "CaskaydiaCove Nerd Font", "Segoe UI", monospace;
@@ -203,6 +206,46 @@
                 z-index: 10;
             }
 
+            .top-bar-context-menu {
+                position: absolute;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                min-width: 172px;
+                padding: 6px;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                background: rgba(24, 24, 30, 0.96);
+                backdrop-filter: blur(18px);
+                -webkit-backdrop-filter: blur(18px);
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+                z-index: 20;
+            }
+
+            .top-bar-context-menu-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                min-height: 30px;
+                padding: 0 10px;
+                border: 0;
+                border-radius: 7px;
+                background: transparent;
+                color: var(--text-primary);
+                font: inherit;
+                text-align: left;
+                cursor: pointer;
+                transition:
+                    background 0.15s ease,
+                    color 0.15s ease;
+            }
+
+            .top-bar-context-menu-item:hover {
+                background: var(--hover);
+                color: var(--accent);
+            }
+
             .warning {
                 color: var(--warning);
             }
@@ -237,6 +280,17 @@
             const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
             const QUICK_SETTINGS_POPUP_WIDTH = 420;
             const QUICK_SETTINGS_POPUP_HEIGHT = 580;
+            const TOP_BAR_HEIGHT = 32;
+            const TOP_BAR_CONTEXT_MENU_WIDTH = 172;
+            const TOP_BAR_CONTEXT_MENU_HEIGHT = 96;
+            const TOP_BAR_CONTEXT_MENU_MARGIN = 8;
+            const ZEBAR_SETTINGS_WINDOW_TIMEOUT_MS = 1500;
+            const ZEBAR_TRAY_TOOLTIP_PREFIX = "Zebar v";
+            const TASK_MANAGER_PROGRAM = "taskmgr.exe";
+            const ZEBAR_SETTINGS_WINDOW_LABEL = "settings";
+            const ZEBAR_SETTINGS_WINDOW_TITLE = "Settings - Zebar";
+            const ZEBAR_SETTINGS_WINDOW_WIDTH = 900;
+            const ZEBAR_SETTINGS_WINDOW_HEIGHT = 600;
             const KOMOREBIC_PROGRAM_CANDIDATES = [
                 "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
                 "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
@@ -256,6 +310,7 @@
                 network: document.getElementById("network"),
                 audio: document.getElementById("audio"),
                 battery: document.getElementById("battery"),
+                topBarContextMenu: null,
             };
 
             const providers = zebar.createProviderGroup({
@@ -273,10 +328,12 @@
                 komorebiRefreshRequest: null,
                 komorebiRefreshSequence: 0,
                 komorebiAppliedRefreshSequence: 0,
+                latestSystrayOutput: null,
                 latestNetworkOutput: null,
                 cellularSignalStrength: null,
                 cellularSignalUpdatedAt: 0,
                 cellularSignalRequest: null,
+                topBarContextMenuOpen: false,
             };
 
             function clamp(value, min, max) {
@@ -1143,6 +1200,347 @@
                 }
             }
 
+            function createTopBarContextMenuItem({
+                action,
+                icon,
+                label,
+            }) {
+                const button = document.createElement("button");
+
+                button.className = "top-bar-context-menu-item";
+                button.type = "button";
+                button.dataset.action = action;
+                button.appendChild(iconSpan(icon));
+                button.appendChild(textSpan("top-bar-context-menu-text", label));
+                button.addEventListener("click", () => {
+                    void runTopBarContextMenuAction(action);
+                });
+
+                return button;
+            }
+
+            function createTopBarContextMenu() {
+                if (elements.topBarContextMenu) {
+                    return elements.topBarContextMenu;
+                }
+
+                const menu = document.createElement("div");
+
+                menu.className = "top-bar-context-menu hidden";
+                menu.setAttribute("role", "menu");
+                menu.appendChild(
+                    createTopBarContextMenuItem({
+                        action: "task-manager",
+                        icon: "󰙨",
+                        label: "Task Manager",
+                    }),
+                );
+                menu.appendChild(
+                    createTopBarContextMenuItem({
+                        action: "zebar-settings",
+                        icon: "󰒓",
+                        label: "Zebar Settings",
+                    }),
+                );
+
+                document.body.appendChild(menu);
+                elements.topBarContextMenu = menu;
+                return menu;
+            }
+
+            function shouldHandleTopBarContextMenu(target) {
+                if (!state.topBarContextMenuOpen && !elements.topBarContextMenu) {
+                    createTopBarContextMenu();
+                }
+
+                if (!(target instanceof HTMLElement)) {
+                    return true;
+                }
+
+                if (elements.topBarContextMenu?.contains(target)) {
+                    return false;
+                }
+
+                if (elements.systray?.contains(target)) {
+                    return false;
+                }
+
+                return document.body.contains(target);
+            }
+
+            function getTopBarContextMenuPosition(clientX = 0, clientY = 0) {
+                const viewportWidth =
+                    Number.isFinite(window?.innerWidth) &&
+                    window.innerWidth > 0
+                        ? window.innerWidth
+                        : TOP_BAR_CONTEXT_MENU_WIDTH +
+                          TOP_BAR_CONTEXT_MENU_MARGIN * 2;
+                const maxLeft = Math.max(
+                    TOP_BAR_CONTEXT_MENU_MARGIN,
+                    viewportWidth -
+                        TOP_BAR_CONTEXT_MENU_WIDTH -
+                        TOP_BAR_CONTEXT_MENU_MARGIN,
+                );
+
+                return {
+                    left: clamp(
+                        Math.round(clientX),
+                        TOP_BAR_CONTEXT_MENU_MARGIN,
+                        maxLeft,
+                    ),
+                    top: Math.max(
+                        TOP_BAR_HEIGHT + 6,
+                        Math.round(clientY),
+                    ),
+                };
+            }
+
+            async function getTauriDpiModule() {
+                const customLoader =
+                    globalThis.__WINTENDER_TOP_BAR_DPI_MODULE_LOADER__;
+
+                if (typeof customLoader === "function") {
+                    return customLoader();
+                }
+
+                return import("https://esm.sh/@tauri-apps/api@2.0.2/dpi");
+            }
+
+            async function setTopBarContextMenuExpanded(expanded) {
+                if (globalThis.__WINTENDER_TOP_BAR_TEST_MODE__) {
+                    return;
+                }
+
+                const tauriWindow = zebar.currentWidget()?.tauriWindow;
+
+                if (!tauriWindow?.setSize) {
+                    return;
+                }
+
+                const width =
+                    Number.isFinite(window?.innerWidth) && window.innerWidth > 0
+                        ? window.innerWidth
+                        : TOP_BAR_CONTEXT_MENU_WIDTH +
+                          TOP_BAR_CONTEXT_MENU_MARGIN * 2;
+                const height = expanded
+                    ? TOP_BAR_HEIGHT +
+                      TOP_BAR_CONTEXT_MENU_HEIGHT +
+                      TOP_BAR_CONTEXT_MENU_MARGIN * 2
+                    : TOP_BAR_HEIGHT;
+
+                try {
+                    const { LogicalSize } = await getTauriDpiModule();
+                    await tauriWindow.setSize(new LogicalSize(width, height));
+                } catch (error) {
+                    console.error(
+                        "Failed to resize top bar for context menu",
+                        error,
+                    );
+                }
+            }
+
+            function openTopBarContextMenu({
+                clientX = 0,
+                clientY = 0,
+            } = {}) {
+                const menu = createTopBarContextMenu();
+                const position = getTopBarContextMenuPosition(clientX, clientY);
+
+                menu.style.left = `${position.left}px`;
+                menu.style.top = `${position.top}px`;
+                toggleHidden(menu, false);
+                state.topBarContextMenuOpen = true;
+                void setTopBarContextMenuExpanded(true);
+            }
+
+            function closeTopBarContextMenu() {
+                const menu = elements.topBarContextMenu;
+
+                if (!menu) {
+                    state.topBarContextMenuOpen = false;
+                    return;
+                }
+
+                toggleHidden(menu, true);
+                state.topBarContextMenuOpen = false;
+                void setTopBarContextMenuExpanded(false);
+            }
+
+            async function getTauriWebviewWindowModule() {
+                const customLoader =
+                    globalThis.__WINTENDER_TOP_BAR_WEBVIEW_WINDOW_LOADER__;
+
+                if (typeof customLoader === "function") {
+                    return customLoader();
+                }
+
+                return import(
+                    "https://esm.sh/@tauri-apps/api@2.0.2/webviewWindow"
+                );
+            }
+
+            async function waitForWebviewWindowCreation(webviewWindow) {
+                if (!webviewWindow?.once) {
+                    return;
+                }
+
+                let timeoutId = null;
+
+                await new Promise((resolve, reject) => {
+                    timeoutId = setTimeout(() => {
+                        reject(
+                            new Error(
+                                "Timed out while creating settings window",
+                            ),
+                        );
+                    }, ZEBAR_SETTINGS_WINDOW_TIMEOUT_MS);
+
+                    webviewWindow.once("tauri://created", resolve);
+                    webviewWindow.once("tauri://error", (error) => {
+                        reject(
+                            new Error(
+                                normalizeText(error?.payload) ||
+                                    "Failed to create settings window",
+                            ),
+                        );
+                    });
+                }).finally(() => {
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                    }
+                });
+            }
+
+            async function openTaskManager(
+                launcher = () => zebar.shellSpawn(TASK_MANAGER_PROGRAM, []),
+            ) {
+                try {
+                    await launcher();
+                } catch (error) {
+                    console.error("Failed to open Task Manager", error);
+                }
+            }
+
+            async function openZebarSettings({
+                getZebarSystrayIcon: getZebarTrayIcon = getZebarSystrayIcon,
+                systrayOutput = state.latestSystrayOutput,
+                triggerZebarSystrayLeftClick: triggerZebarTrayLeftClick =
+                    (iconId) =>
+                        triggerZebarSystrayLeftClick(iconId, systrayOutput),
+                getWindowModule = getTauriWebviewWindowModule,
+            } = {}) {
+                try {
+                    const zebarTrayIcon = getZebarTrayIcon(systrayOutput);
+
+                    if (zebarTrayIcon?.id) {
+                        const openedByTray = await triggerZebarTrayLeftClick(
+                            zebarTrayIcon.id,
+                        );
+
+                        if (openedByTray !== false) {
+                            return;
+                        }
+                    }
+
+                    const { WebviewWindow } = await getWindowModule();
+                    const existingWindow = await WebviewWindow.getByLabel(
+                        ZEBAR_SETTINGS_WINDOW_LABEL,
+                    );
+
+                    if (existingWindow) {
+                        await existingWindow.show?.();
+                        await existingWindow.unminimize?.();
+                        await existingWindow.setFocus?.();
+                        return;
+                    }
+
+                    const settingsWindow = new WebviewWindow(
+                        ZEBAR_SETTINGS_WINDOW_LABEL,
+                        {
+                            url: "/index.html",
+                            title: ZEBAR_SETTINGS_WINDOW_TITLE,
+                            visible: true,
+                            focus: true,
+                            center: true,
+                            width: ZEBAR_SETTINGS_WINDOW_WIDTH,
+                            height: ZEBAR_SETTINGS_WINDOW_HEIGHT,
+                        },
+                    );
+
+                    await waitForWebviewWindowCreation(settingsWindow);
+                    await settingsWindow.show?.();
+                    await settingsWindow.setFocus?.();
+                } catch (error) {
+                    console.error("Failed to open Zebar settings", error);
+                }
+            }
+
+            async function runTopBarContextMenuAction(
+                action,
+                {
+                    openTaskManager: taskManagerOpener = openTaskManager,
+                    openZebarSettings: zebarSettingsOpener =
+                        openZebarSettings,
+                } = {},
+            ) {
+                closeTopBarContextMenu();
+
+                if (action === "task-manager") {
+                    await taskManagerOpener();
+                    return;
+                }
+
+                if (action === "zebar-settings") {
+                    await zebarSettingsOpener();
+                }
+            }
+
+            function handleTopBarContextMenu(event) {
+                if (!shouldHandleTopBarContextMenu(event?.target)) {
+                    closeTopBarContextMenu();
+                    return;
+                }
+
+                event.preventDefault();
+                openTopBarContextMenu(event);
+            }
+
+            function handleTopBarContextMenuClick(event) {
+                if (!state.topBarContextMenuOpen) {
+                    return;
+                }
+
+                if (elements.topBarContextMenu?.contains(event?.target)) {
+                    return;
+                }
+
+                closeTopBarContextMenu();
+            }
+
+            function handleTopBarContextMenuKeydown(event) {
+                if (!state.topBarContextMenuOpen) {
+                    return;
+                }
+
+                if (event?.key === "Escape") {
+                    closeTopBarContextMenu();
+                }
+            }
+
+            function setupTopBarContextMenu() {
+                createTopBarContextMenu();
+                document.addEventListener(
+                    "contextmenu",
+                    handleTopBarContextMenu,
+                );
+                document.addEventListener("click", handleTopBarContextMenuClick);
+                document.addEventListener(
+                    "keydown",
+                    handleTopBarContextMenuKeydown,
+                );
+                window.addEventListener("blur", closeTopBarContextMenu);
+            }
+
             function buildTrayButton(icon, systrayOutput) {
                 const button = document.createElement("button");
                 const image = document.createElement("img");
@@ -1342,6 +1740,32 @@
                 toggleHidden(elements.systray, false);
             }
 
+            function getZebarSystrayIcon(
+                systrayOutput = state.latestSystrayOutput,
+            ) {
+                const icons = systrayOutput?.icons ?? [];
+
+                return (
+                    icons.find((icon) =>
+                        normalizeText(icon?.tooltip).startsWith(
+                            ZEBAR_TRAY_TOOLTIP_PREFIX,
+                        ),
+                    ) ?? null
+                );
+            }
+
+            async function triggerZebarSystrayLeftClick(
+                iconId,
+                systrayOutput = state.latestSystrayOutput,
+            ) {
+                if (!iconId || typeof systrayOutput?.onLeftClick !== "function") {
+                    return false;
+                }
+
+                await systrayOutput.onLeftClick(iconId);
+                return true;
+            }
+
             function renderNetwork(networkOutput) {
                 const networkState = getNetworkState(networkOutput, {
                     cellularSignalStrength: state.cellularSignalStrength,
@@ -1412,13 +1836,23 @@
                 toggleHidden(elements.battery, false);
             }
 
+            setupTopBarContextMenu();
+
             const TEST_HOOKS = {
                 elements,
+                closeTopBarContextMenu,
                 getQuickSettingsPlacement,
+                getZebarSystrayIcon,
+                openTaskManager,
+                openTopBarContextMenu,
+                openZebarSettings,
                 openQuickSettings,
                 renderNetwork,
                 renderAudio,
                 renderBattery,
+                runTopBarContextMenuAction,
+                shouldHandleTopBarContextMenu,
+                triggerZebarSystrayLeftClick,
             };
 
             if (globalThis.__WINTENDER_TOP_BAR_TEST_MODE__) {
@@ -1429,6 +1863,7 @@
                         state.latestKomorebiOutput = output.komorebi;
                     }
 
+                    state.latestSystrayOutput = output.systray;
                     state.latestNetworkOutput = output.network;
                     renderKomorebi(output.komorebi ?? state.latestKomorebiOutput);
                     renderDate(output.date);
