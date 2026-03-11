@@ -1,0 +1,246 @@
+name: Mainline Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_features:
+        description: "New features (use \\n for line breaks, leave empty if none)"
+        required: false
+        type: string
+        default: ""
+      bug_fixes:
+        description: "Bug fixes (use \\n for line breaks, leave empty if none)"
+        required: false
+        type: string
+        default: ""
+      other_changes:
+        description: "Other changes (use \\n for line breaks, leave empty if none)"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Ensure main branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "Mainline releases must run from the main branch." >&2
+            exit 1
+          fi
+
+      - name: Get version and SHA
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PACK_NAME="$(node -p "require('./zpack.json').name")"
+          PACK_VERSION="$(node -p "require('./zpack.json').version")"
+          TAG_NAME="v${PACK_VERSION}"
+          RELEASE_NAME="🚀 ${PACK_NAME} ${TAG_NAME}"
+          PACKAGE_NAME="${PACK_NAME}-${TAG_NAME}.tar.gz"
+          COMMIT_SHA="$(git rev-parse HEAD)"
+
+          {
+            echo "pack_name=${PACK_NAME}"
+            echo "pack_version=${PACK_VERSION}"
+            echo "tag_name=${TAG_NAME}"
+            echo "release_name=${RELEASE_NAME}"
+            echo "package_name=${PACKAGE_NAME}"
+            echo "commit_sha=${COMMIT_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure version has not been released
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git rev-parse "${{ steps.version.outputs.tag_name }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.version.outputs.tag_name }} already exists." >&2
+            echo "Bump zpack.json version before creating a new mainline release." >&2
+            exit 1
+          fi
+
+      - name: Create and push tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "${{ steps.version.outputs.tag_name }}" -m "Mainline release ${{ steps.version.outputs.tag_name }}"
+          git push origin "${{ steps.version.outputs.tag_name }}"
+
+      - name: Prepare release contents
+        id: release_contents
+        env:
+          NEW_FEATURES: ${{ github.event.inputs.new_features }}
+          BUG_FIXES: ${{ github.event.inputs.bug_fixes }}
+          OTHER_CHANGES: ${{ github.event.inputs.other_changes }}
+          PACK_NAME: ${{ steps.version.outputs.pack_name }}
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+          COMMIT_SHA: ${{ steps.version.outputs.commit_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          : > release_body.txt
+
+          if [ -n "${NEW_FEATURES}" ]; then
+            echo "## 🎉 New Features" >> release_body.txt
+            echo "${NEW_FEATURES}" | sed 's/\\n/\n/g' | sed 's/^[[:space:]]*-*/- /' | sed '/^[[:space:]]*$/d' >> release_body.txt
+            echo "" >> release_body.txt
+          fi
+
+          if [ -n "${BUG_FIXES}" ]; then
+            echo "## 🐛 Bug Fixes" >> release_body.txt
+            echo "${BUG_FIXES}" | sed 's/\\n/\n/g' | sed 's/^[[:space:]]*-*/- /' | sed '/^[[:space:]]*$/d' >> release_body.txt
+            echo "" >> release_body.txt
+          fi
+
+          if [ -n "${OTHER_CHANGES}" ]; then
+            echo "## 🔧 Other Changes" >> release_body.txt
+            echo "${OTHER_CHANGES}" | sed 's/\\n/\n/g' | sed 's/^[[:space:]]*-*/- /' | sed '/^[[:space:]]*$/d' >> release_body.txt
+            echo "" >> release_body.txt
+          fi
+
+          echo "## 📦 Installation" >> release_body.txt
+          echo "1. Open Zebar Marketplace." >> release_body.txt
+          printf '2. Install or update `%s`.\n\n' "${PACK_NAME}" >> release_body.txt
+
+          echo "## 🔖 Release Metadata" >> release_body.txt
+          printf -- '- Version: `%s`\n' "${TAG_NAME}" >> release_body.txt
+          printf -- '- Commit: `%s`\n' "${COMMIT_SHA}" >> release_body.txt
+
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          cat release_body.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Package widget pack
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+
+          mkdir -p dist
+
+          {
+            printf 'zpack.json\n'
+            node -e "const z=require('./zpack.json'); for (const image of z.previewImages || []) console.log(String(image).replace(/^\\.\\//, ''));"
+            find . -maxdepth 1 -type f \( -iname 'README.md' -o -iname 'README' -o -iname 'LICENSE.md' -o -iname 'LICENSE.txt' -o -iname 'LICENSE' \) -printf '%P\n'
+          } > release-files.txt
+
+          node -e "const z=require('./zpack.json'); const patterns=[...new Set((z.widgets || []).flatMap(widget => widget.includeFiles || []))]; for (const pattern of patterns) console.log(pattern);" > include-patterns.txt
+
+          while IFS= read -r pattern; do
+            [ -z "$pattern" ] && continue
+            matches=( $pattern )
+            [ "${#matches[@]}" -eq 0 ] && continue
+            printf '%s\n' "${matches[@]}" >> release-files.txt
+          done < include-patterns.txt
+
+          LC_ALL=C sort -u release-files.txt > release-files.sorted.txt
+
+          PACKAGE_PATH="dist/${{ steps.version.outputs.package_name }}"
+          tar -czf "$PACKAGE_PATH" -T release-files.sorted.txt
+
+          echo "package_path=${PACKAGE_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          release_name: ${{ steps.version.outputs.release_name }}
+          body: ${{ steps.release_contents.outputs.body }}
+          draft: false
+          prerelease: false
+
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.package.outputs.package_path }}
+          asset_name: ${{ steps.version.outputs.package_name }}
+          asset_content_type: application/gzip
+
+      - name: Publish to Zebar Marketplace
+        env:
+          ZEBAR_PUBLISH_TOKEN: ${{ secrets.ZEBAR_PUBLISH_TOKEN }}
+          PACKAGE_PATH: ${{ steps.package.outputs.package_path }}
+          RELEASE_URL: ${{ steps.create_release.outputs.html_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${ZEBAR_PUBLISH_TOKEN:-}" ]; then
+            echo "ZEBAR_PUBLISH_TOKEN secret is required." >&2
+            exit 1
+          fi
+
+          RESPONSE_FILE="$(mktemp)"
+
+          HTTP_CODE="$(
+            curl -sS -o "$RESPONSE_FILE" -w '%{http_code}' \
+              -X POST 'https://api.glzr.io/v1/trpc/widgetPack.publishVersion' \
+              -H "X-API-TOKEN: ${ZEBAR_PUBLISH_TOKEN}" \
+              -F "packConfig=@zpack.json;type=application/json" \
+              -F "tarball=@${PACKAGE_PATH}" \
+              -F "commitSha=${{ steps.version.outputs.commit_sha }}" \
+              -F "releaseUrl=${RELEASE_URL}" \
+              -F "releaseNotes=<release_body.txt"
+          )"
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "Marketplace publish request failed with HTTP ${HTTP_CODE}." >&2
+            cat "$RESPONSE_FILE" >&2
+            exit 1
+          fi
+
+          node - "$RESPONSE_FILE" <<'NODE'
+          const fs = require('fs');
+
+          const responsePath = process.argv[2];
+          const raw = fs.readFileSync(responsePath, 'utf8');
+          const payload = JSON.parse(raw);
+          const published = payload?.result?.data?.json?.widget_pack;
+
+          if (published?.published_id && published?.latest_version) {
+            console.log(
+              `Published ${published.published_id}@${published.latest_version} to Zebar Marketplace.`,
+            );
+            process.exit(0);
+          }
+
+          const message =
+            payload?.error?.json?.message ||
+            payload?.error?.message ||
+            'Unknown marketplace publish error.';
+
+          console.error(message);
+          process.exit(1);
+          NODE
