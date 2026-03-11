@@ -1,183 +1,177 @@
 {
-  "$schema": "https://github.com/glzr-io/zebar/raw/v3.1.1/resources/zpack-schema.json",
-  "name": "wintender",
-  "version": "0.0.0",
-  "description": "wintender top bar for Windows 11",
-  "tags": ["status-bar"],
-  "widgets": [
-    {
-      "name": "top-bar",
-      "htmlPath": "./index.html",
-      "zOrder": "top_most",
-      "shownInTaskbar": false,
-      "focused": false,
-      "resizable": false,
-      "transparent": true,
-      "includeFiles": ["*.html", "resources/*"],
-      "privileges": {
-        "shellCommands": [
-          {
-            "program": "netsh.exe",
-            "argsRegex": "^mbn show interfaces$"
-          },
-          {
-            "program": "explorer.exe",
-            "argsRegex": "^(ms-availablenetworks:|ms-settings:network)$"
-          },
-          {
-            "program": "taskmgr.exe",
-            "argsRegex": "^$"
-          },
-          {
-            "program": "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
-            "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
-          },
-          {
-            "program": "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
-            "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
-          },
-          {
-            "program": "komorebic.exe",
-            "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
-          }
-        ]
-      },
-      "presets": [
+    "$schema": "https://github.com/glzr-io/zebar/raw/v3.1.1/resources/zpack-schema.json",
+    "name": "wintender",
+    "version": "1.0.0",
+    "description": "wintender top bar for Windows 11",
+    "tags": ["status-bar"],
+    "widgets": [
         {
-          "name": "default",
-          "anchor": "top_left",
-          "offsetX": "0px",
-          "offsetY": "0px",
-          "width": "100%",
-          "height": "32px",
-          "monitorSelection": {
-            "type": "all"
-          },
-          "dockToEdge": {
-            "enabled": true,
-            "edge": "top",
-            "windowMargin": "0px"
-          }
-        }
-      ],
-      "providers": [
-        "komorebi",
-        "date",
-        "battery",
-        "network",
-        "audio",
-        "systray",
-        "media"
-      ]
-    },
-    {
-      "name": "tray-popup",
-      "htmlPath": "./tray-popup.html",
-      "zOrder": "top_most",
-      "shownInTaskbar": false,
-      "focused": true,
-      "resizable": false,
-      "transparent": true,
-      "includeFiles": ["*.html", "resources/*"],
-      "presets": [
+            "name": "top-bar",
+            "htmlPath": "./index.html",
+            "zOrder": "top_most",
+            "shownInTaskbar": false,
+            "focused": false,
+            "resizable": false,
+            "transparent": true,
+            "includeFiles": ["*.html", "resources/*"],
+            "privileges": {
+                "shellCommands": [
+                    {
+                        "program": "netsh.exe",
+                        "argsRegex": "^mbn show interfaces$"
+                    },
+                    {
+                        "program": "explorer.exe",
+                        "argsRegex": "^(ms-availablenetworks:|ms-settings:network)$"
+                    },
+                    {
+                        "program": "taskmgr.exe",
+                        "argsRegex": "^$"
+                    },
+                    {
+                        "program": "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
+                        "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
+                    },
+                    {
+                        "program": "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
+                        "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
+                    },
+                    {
+                        "program": "komorebic.exe",
+                        "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
+                    }
+                ]
+            },
+            "presets": [
+                {
+                    "name": "default",
+                    "anchor": "top_left",
+                    "offsetX": "0px",
+                    "offsetY": "0px",
+                    "width": "100%",
+                    "height": "32px",
+                    "monitorSelection": {
+                        "type": "all"
+                    },
+                    "dockToEdge": {
+                        "enabled": true,
+                        "edge": "top",
+                        "windowMargin": "0px"
+                    }
+                }
+            ],
+            "providers": [
+                "komorebi",
+                "date",
+                "battery",
+                "network",
+                "audio",
+                "systray",
+                "media"
+            ]
+        },
         {
-          "name": "default",
-          "anchor": "top_right",
-          "offsetX": "0px",
-          "offsetY": "40px",
-          "width": "220px",
-          "height": "44px",
-          "monitorSelection": {
-            "type": "primary"
-          },
-          "dockToEdge": {
-            "enabled": false,
-            "edge": null,
-            "windowMargin": "0px"
-          }
-        }
-      ],
-      "providers": [
-        "systray"
-      ]
-    },
-    {
-      "name": "quick-settings",
-      "htmlPath": "./quick-settings.html",
-      "zOrder": "top_most",
-      "shownInTaskbar": false,
-      "focused": true,
-      "resizable": false,
-      "transparent": true,
-      "includeFiles": ["*.html", "resources/*"],
-      "privileges": {
-        "shellCommands": [
-          {
-            "program": "netsh.exe",
-            "argsRegex": "^(mbn show interfaces|mbn show profiles .+|mbn connect .+|mbn disconnect .+|wlan show networks mode=bssid|wlan connect .+)$"
-          },
-          {
-            "program": "powershell.exe",
-            "argsRegex": "^-NoProfile -NonInteractive -WindowStyle Hidden -Command .+$"
-          },
-          {
-            "program": "rasdial.exe",
-            "argsRegex": "^.+( /disconnect)?$"
-          }
-        ]
-      },
-      "presets": [
+            "name": "tray-popup",
+            "htmlPath": "./tray-popup.html",
+            "zOrder": "top_most",
+            "shownInTaskbar": false,
+            "focused": true,
+            "resizable": false,
+            "transparent": true,
+            "includeFiles": ["*.html", "resources/*"],
+            "presets": [
+                {
+                    "name": "default",
+                    "anchor": "top_right",
+                    "offsetX": "0px",
+                    "offsetY": "40px",
+                    "width": "220px",
+                    "height": "44px",
+                    "monitorSelection": {
+                        "type": "primary"
+                    },
+                    "dockToEdge": {
+                        "enabled": false,
+                        "edge": null,
+                        "windowMargin": "0px"
+                    }
+                }
+            ],
+            "providers": ["systray"]
+        },
         {
-          "name": "default",
-          "anchor": "top_right",
-          "offsetX": "0px",
-          "offsetY": "40px",
-          "width": "420px",
-          "height": "580px",
-          "monitorSelection": {
-            "type": "primary"
-          },
-          "dockToEdge": {
-            "enabled": false,
-            "edge": null,
-            "windowMargin": "0px"
-          }
-        }
-      ],
-      "providers": [
-        "battery",
-        "network",
-        "audio"
-      ]
-    },
-    {
-      "name": "wintender-settings",
-      "htmlPath": "./wintender-settings.html",
-      "zOrder": "top_most",
-      "shownInTaskbar": false,
-      "focused": true,
-      "resizable": false,
-      "transparent": true,
-      "includeFiles": ["*.html", "resources/*"],
-      "presets": [
+            "name": "quick-settings",
+            "htmlPath": "./quick-settings.html",
+            "zOrder": "top_most",
+            "shownInTaskbar": false,
+            "focused": true,
+            "resizable": false,
+            "transparent": true,
+            "includeFiles": ["*.html", "resources/*"],
+            "privileges": {
+                "shellCommands": [
+                    {
+                        "program": "netsh.exe",
+                        "argsRegex": "^(mbn show interfaces|mbn show profiles .+|mbn connect .+|mbn disconnect .+|wlan show networks mode=bssid|wlan connect .+)$"
+                    },
+                    {
+                        "program": "powershell.exe",
+                        "argsRegex": "^-NoProfile -NonInteractive -WindowStyle Hidden -Command .+$"
+                    },
+                    {
+                        "program": "rasdial.exe",
+                        "argsRegex": "^.+( /disconnect)?$"
+                    }
+                ]
+            },
+            "presets": [
+                {
+                    "name": "default",
+                    "anchor": "top_right",
+                    "offsetX": "0px",
+                    "offsetY": "40px",
+                    "width": "420px",
+                    "height": "580px",
+                    "monitorSelection": {
+                        "type": "primary"
+                    },
+                    "dockToEdge": {
+                        "enabled": false,
+                        "edge": null,
+                        "windowMargin": "0px"
+                    }
+                }
+            ],
+            "providers": ["battery", "network", "audio"]
+        },
         {
-          "name": "default",
-          "anchor": "top_right",
-          "offsetX": "0px",
-          "offsetY": "40px",
-          "width": "420px",
-          "height": "420px",
-          "monitorSelection": {
-            "type": "primary"
-          },
-          "dockToEdge": {
-            "enabled": false,
-            "edge": null,
-            "windowMargin": "0px"
-          }
+            "name": "wintender-settings",
+            "htmlPath": "./wintender-settings.html",
+            "zOrder": "top_most",
+            "shownInTaskbar": false,
+            "focused": true,
+            "resizable": false,
+            "transparent": true,
+            "includeFiles": ["*.html", "resources/*"],
+            "presets": [
+                {
+                    "name": "default",
+                    "anchor": "top_right",
+                    "offsetX": "0px",
+                    "offsetY": "40px",
+                    "width": "420px",
+                    "height": "420px",
+                    "monitorSelection": {
+                        "type": "primary"
+                    },
+                    "dockToEdge": {
+                        "enabled": false,
+                        "edge": null,
+                        "windowMargin": "0px"
+                    }
+                }
+            ],
+            "providers": []
         }
-      ],
-      "providers": []
-    }
-  ]
+    ]
 }
