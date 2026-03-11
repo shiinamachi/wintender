@@ -207,6 +207,7 @@ jobs:
           ZEBAR_PUBLISH_TOKEN: ${{ secrets.ZEBAR_PUBLISH_TOKEN }}
           RELEASE_URL: ${{ steps.create_release.outputs.html_url }}
           COMMIT_SHA: ${{ steps.version.outputs.commit_sha }}
+          PACK_VERSION: ${{ steps.version.outputs.pack_version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -221,9 +222,20 @@ jobs:
           mkdir -p "${XDG_RUNTIME_DIR}"
           chmod 700 "${XDG_RUNTIME_DIR}"
 
+          PUBLISH_ARGS=(
+            publish
+            --token "${ZEBAR_PUBLISH_TOKEN}"
+            --pack-config ./zpack.json
+            --version-override "${PACK_VERSION}"
+            --commit-sha "${COMMIT_SHA}"
+            --release-notes "${RELEASE_NOTES}"
+          )
+
+          if [ -n "${RELEASE_URL:-}" ]; then
+            PUBLISH_ARGS+=(--release-url "${RELEASE_URL}")
+          fi
+
+          zebar --version
+
           xvfb-run --auto-servernum --server-args='-screen 0 1280x720x24' \
-            zebar publish \
-              --pack-config ./zpack.json \
-              --commit-sha "${COMMIT_SHA}" \
-              --release-url "${RELEASE_URL}" \
-              --release-notes "${RELEASE_NOTES}"
+            zebar "${PUBLISH_ARGS[@]}"
