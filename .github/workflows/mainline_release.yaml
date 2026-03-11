@@ -22,6 +22,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      ZEBAR_VERSION: v3.2.0
 
     permissions:
       contents: write
@@ -36,6 +38,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install Zebar CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PACKAGE_FILE="zebar-${ZEBAR_VERSION}-opt4-x64.deb"
+          PACKAGE_URL="https://github.com/glzr-io/zebar/releases/download/${ZEBAR_VERSION}/${PACKAGE_FILE}"
+
+          curl -L -o "${PACKAGE_FILE}" "${PACKAGE_URL}"
+          sudo apt-get update
+          sudo apt-get install -y "./${PACKAGE_FILE}"
 
       - name: Ensure main branch
         shell: bash
@@ -191,7 +205,6 @@ jobs:
       - name: Publish to Zebar Marketplace
         env:
           ZEBAR_PUBLISH_TOKEN: ${{ secrets.ZEBAR_PUBLISH_TOKEN }}
-          PACKAGE_PATH: ${{ steps.package.outputs.package_path }}
           RELEASE_URL: ${{ steps.create_release.outputs.html_url }}
           COMMIT_SHA: ${{ steps.version.outputs.commit_sha }}
         shell: bash
@@ -203,89 +216,10 @@ jobs:
             exit 1
           fi
 
-          node <<'NODE'
-          const fs = require('fs');
-          const path = require('path');
+          RELEASE_NOTES="$(cat release_body.txt)"
 
-          async function main() {
-            const token = process.env.ZEBAR_PUBLISH_TOKEN;
-            const packagePath = process.env.PACKAGE_PATH;
-            const releaseUrl = process.env.RELEASE_URL;
-            const commitSha = process.env.COMMIT_SHA;
-            const releaseNotes = fs.readFileSync('release_body.txt', 'utf8');
-
-            const form = new FormData();
-            form.append(
-              'packConfig',
-              new Blob([await fs.promises.readFile('zpack.json')], {
-                type: 'application/json',
-              }),
-              'zpack.json',
-            );
-            form.append(
-              'tarball',
-              new Blob([await fs.promises.readFile(packagePath)], {
-                type: 'application/gzip',
-              }),
-              path.basename(packagePath),
-            );
-            form.append('commitSha', commitSha);
-            form.append('releaseNotes', releaseNotes);
-
-            if (releaseUrl) {
-              form.append('releaseUrl', releaseUrl);
-            }
-
-            const response = await fetch(
-              'https://api.glzr.io/v1/trpc/widgetPack.publishVersion',
-              {
-                method: 'POST',
-                headers: {
-                  'X-API-TOKEN': token,
-                },
-                body: form,
-              },
-            );
-
-            const raw = await response.text();
-
-            if (!response.ok) {
-              console.error(
-                `Marketplace publish request failed with HTTP ${response.status}.`,
-              );
-              console.error(raw);
-              process.exit(1);
-            }
-
-            let payload;
-            try {
-              payload = JSON.parse(raw);
-            } catch (error) {
-              console.error('Marketplace publish returned non-JSON response.');
-              console.error(raw);
-              process.exit(1);
-            }
-
-            const published = payload?.result?.data?.json?.widget_pack;
-
-            if (published?.published_id && published?.latest_version) {
-              console.log(
-                `Published ${published.published_id}@${published.latest_version} to Zebar Marketplace.`,
-              );
-              return;
-            }
-
-            const message =
-              payload?.error?.json?.message ||
-              payload?.error?.message ||
-              'Unknown marketplace publish error.';
-
-            console.error(message);
-            process.exit(1);
-          }
-
-          main().catch((error) => {
-            console.error(error);
-            process.exit(1);
-          });
-          NODE
+          zebar publish \
+            --pack-config ./zpack.json \
+            --commit-sha "${COMMIT_SHA}" \
+            --release-url "${RELEASE_URL}" \
+            --release-notes "${RELEASE_NOTES}"
