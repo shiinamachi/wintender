@@ -73,8 +73,10 @@
             ],
             "providers": [
                 "komorebi",
+                "ip",
                 "date",
                 "battery",
+                "weather",
                 "network",
                 "audio",
                 "systray",

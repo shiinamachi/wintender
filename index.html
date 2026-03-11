@@ -114,6 +114,7 @@
 
             .media-text,
             .workspace-text,
+            .weather-text,
             .network-text,
             .audio-text,
             .battery-text {
@@ -266,6 +267,7 @@
             <div class="section section-right">
                 <div id="media" class="pill hidden"></div>
                 <div id="systray" class="tray hidden"></div>
+                <div id="weather" class="pill hidden"></div>
                 <div id="network" class="pill interactive hidden"></div>
                 <div id="audio" class="pill interactive hidden"></div>
                 <div id="battery" class="pill interactive hidden"></div>
@@ -278,6 +280,7 @@
             const VOLUME_STEP = 5;
             const CELLULAR_SIGNAL_REFRESH_INTERVAL = 5000;
             const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
+            const WEATHER_REFRESH_INTERVAL = 15 * 60 * 1000;
             const QUICK_SETTINGS_POPUP_WIDTH = 420;
             const QUICK_SETTINGS_POPUP_HEIGHT = 580;
             const WINTENDER_SETTINGS_WIDTH = 420;
@@ -302,6 +305,7 @@
             const DEFAULT_USER_SETTINGS = Object.freeze({
                 showKomorebiWorkspaces: true,
                 showSystray: true,
+                showWeather: false,
                 showNetwork: true,
                 showAudio: true,
                 showBattery: true,
@@ -316,6 +320,7 @@
                 datetime: document.getElementById("datetime"),
                 media: document.getElementById("media"),
                 systray: document.getElementById("systray"),
+                weather: document.getElementById("weather"),
                 network: document.getElementById("network"),
                 audio: document.getElementById("audio"),
                 battery: document.getElementById("battery"),
@@ -340,12 +345,15 @@
                 komorebiRefreshSequence: 0,
                 komorebiAppliedRefreshSequence: 0,
                 latestSystrayOutput: null,
+                latestIpOutput: null,
+                latestWeatherOutput: null,
                 latestNetworkOutput: null,
                 latestAudioOutput: null,
                 latestBatteryOutput: null,
                 cellularSignalStrength: null,
                 cellularSignalUpdatedAt: 0,
                 cellularSignalRequest: null,
+                weatherProviderGroup: null,
                 topBarContextMenuOpen: false,
                 userSettings: { ...DEFAULT_USER_SETTINGS },
                 userSettingsStorageRaw: null,
@@ -412,6 +420,10 @@
 
                 if (typeof rawSettings.showSystray === "boolean") {
                     settings.showSystray = rawSettings.showSystray;
+                }
+
+                if (typeof rawSettings.showWeather === "boolean") {
+                    settings.showWeather = rawSettings.showWeather;
                 }
 
                 if (typeof rawSettings.showNetwork === "boolean") {
@@ -576,6 +588,7 @@
                 renderDate(state.latestDateOutput);
                 renderMedia(state.latestMediaOutput);
                 renderSystray(state.latestSystrayOutput);
+                renderWeather(state.latestWeatherOutput);
                 renderNetwork(state.latestNetworkOutput);
                 renderAudio(state.latestAudioOutput);
                 renderBattery(state.latestBatteryOutput);
@@ -588,8 +601,13 @@
                     rerender = true,
                 } = {},
             ) {
+                const previousSettings = state.userSettings;
                 state.userSettings = mergeUserSettings(rawSettings);
                 state.userSettingsStorageRaw = raw;
+                syncWeatherProviderForSettings({
+                    previousSettings,
+                    nextSettings: state.userSettings,
+                });
 
                 if (rerender) {
                     renderAllCurrentState();
@@ -742,6 +760,55 @@
                 return {
                     icon: session.isPlaying ? "󰏤" : "󰐊",
                     text,
+                };
+            }
+
+            function getWeatherStatusIcon(status) {
+                switch (status) {
+                    case "clear_day":
+                        return "☀";
+                    case "clear_night":
+                        return "☾";
+                    case "cloudy_day":
+                    case "cloudy_night":
+                        return "☁";
+                    case "light_rain_day":
+                    case "light_rain_night":
+                    case "heavy_rain_day":
+                    case "heavy_rain_night":
+                        return "☂";
+                    case "snow_day":
+                    case "snow_night":
+                        return "❄";
+                    case "thunder_day":
+                    case "thunder_night":
+                        return "⚡";
+                    default:
+                        return "☁";
+                }
+            }
+
+            function getWeatherState(
+                weatherOutput,
+                ipOutput = state.latestIpOutput,
+            ) {
+                const celsiusTemp = weatherOutput?.celsiusTemp;
+                const status = normalizeText(weatherOutput?.status);
+                const approxCity = normalizeText(ipOutput?.approxCity);
+                const approxCountry = normalizeText(ipOutput?.approxCountry);
+
+                if (!Number.isFinite(celsiusTemp) || !status) {
+                    return null;
+                }
+
+                const locationLabel = approxCity || approxCountry;
+                const temperatureLabel = `${Math.round(celsiusTemp)}°C`;
+
+                return {
+                    icon: getWeatherStatusIcon(status),
+                    text: locationLabel
+                        ? `${locationLabel} ${temperatureLabel}`
+                        : temperatureLabel,
                 };
             }
 
@@ -1265,6 +1332,59 @@
                         );
                     }
                 }
+            }
+
+            function initializeWeatherProvider() {
+                if (state.weatherProviderGroup) {
+                    return state.weatherProviderGroup;
+                }
+
+                const providerGroup = zebar.createProviderGroup({
+                    ip: {
+                        type: "ip",
+                        refreshInterval: WEATHER_REFRESH_INTERVAL,
+                    },
+                    weather: {
+                        type: "weather",
+                        refreshInterval: WEATHER_REFRESH_INTERVAL,
+                    },
+                });
+
+                providerGroup.onOutput((output) => {
+                    state.latestIpOutput = output?.ip ?? state.latestIpOutput;
+                    state.latestWeatherOutput = output?.weather ?? null;
+                    renderWeather(state.latestWeatherOutput);
+                });
+                providerGroup.onError((errorMap) => {
+                    if (errorMap?.ip) {
+                        state.latestIpOutput = null;
+                    }
+                    state.latestWeatherOutput = null;
+                    renderWeather(null);
+                    console.error("Weather provider error", errorMap);
+                });
+
+                state.weatherProviderGroup = providerGroup;
+                return providerGroup;
+            }
+
+            async function ensureWeatherProvider() {
+                if (!state.userSettings.showWeather) {
+                    return null;
+                }
+
+                return initializeWeatherProvider();
+            }
+
+            function syncWeatherProviderForSettings({ nextSettings }) {
+                const isEnabled = nextSettings?.showWeather === true;
+
+                if (!isEnabled) {
+                    renderWeather(null);
+                    return;
+                }
+
+                void ensureWeatherProvider();
             }
 
             function getAudioState(audioOutput) {
@@ -2099,6 +2219,28 @@
                 return true;
             }
 
+            function renderWeather(weatherOutput) {
+                if (!state.userSettings.showWeather) {
+                    clearElement(elements.weather);
+                    toggleHidden(elements.weather, true);
+                    return;
+                }
+
+                const weatherState = getWeatherState(weatherOutput);
+                clearElement(elements.weather);
+
+                if (!weatherState) {
+                    toggleHidden(elements.weather, true);
+                    return;
+                }
+
+                elements.weather.appendChild(iconSpan(weatherState.icon));
+                elements.weather.appendChild(
+                    textSpan("weather-text", weatherState.text),
+                );
+                toggleHidden(elements.weather, false);
+            }
+
             function renderNetwork(networkOutput) {
                 if (!state.userSettings.showNetwork) {
                     clearElement(elements.network);
@@ -2203,11 +2345,13 @@
             const TEST_HOOKS = {
                 DEFAULT_USER_SETTINGS,
                 applyUserSettings,
+                ensureWeatherProvider,
                 elements,
                 closeTopBarContextMenu,
                 formatClockText,
                 getQuickSettingsPlacement,
                 getTrayGroups,
+                getWeatherState,
                 getWintenderSettingsPlacement,
                 getUserSettings: () => ({ ...state.userSettings }),
                 getZebarSystrayIcon,
@@ -2218,6 +2362,7 @@
                 openQuickSettings,
                 renderDate,
                 renderSystray,
+                renderWeather,
                 renderNetwork,
                 renderAudio,
                 renderBattery,

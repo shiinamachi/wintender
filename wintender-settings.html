@@ -390,6 +390,21 @@
 
                         <label class="setting-row">
                             <div class="setting-copy">
+                                <span class="setting-title">Weather</span>
+                                <span class="setting-description">
+                                    Show estimated local weather to the left of
+                                    the network pill.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-weather" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
                                 <span class="setting-title">Network</span>
                                 <span class="setting-description">
                                     Show or hide the network pill on the right.
@@ -520,6 +535,7 @@
             const DEFAULT_USER_SETTINGS = Object.freeze({
                 showKomorebiWorkspaces: true,
                 showSystray: true,
+                showWeather: false,
                 showNetwork: true,
                 showAudio: true,
                 showBattery: true,
@@ -539,6 +555,7 @@
                     "show-komorebi-workspaces",
                 ),
                 showSystray: document.getElementById("show-systray"),
+                showWeather: document.getElementById("show-weather"),
                 showNetwork: document.getElementById("show-network"),
                 showAudio: document.getElementById("show-audio"),
                 showBattery: document.getElementById("show-battery"),
@@ -583,6 +600,10 @@
 
                 if (typeof rawSettings.showSystray === "boolean") {
                     settings.showSystray = rawSettings.showSystray;
+                }
+
+                if (typeof rawSettings.showWeather === "boolean") {
+                    settings.showWeather = rawSettings.showWeather;
                 }
 
                 if (typeof rawSettings.showNetwork === "boolean") {
@@ -815,6 +836,7 @@
                 elements.showKomorebiWorkspaces.checked =
                     state.userSettings.showKomorebiWorkspaces;
                 elements.showSystray.checked = state.userSettings.showSystray;
+                elements.showWeather.checked = state.userSettings.showWeather;
                 elements.showNetwork.checked = state.userSettings.showNetwork;
                 elements.showAudio.checked = state.userSettings.showAudio;
                 elements.showBattery.checked = state.userSettings.showBattery;
@@ -828,6 +850,7 @@
                     showKomorebiWorkspaces:
                         elements.showKomorebiWorkspaces.checked,
                     showSystray: elements.showSystray.checked,
+                    showWeather: elements.showWeather.checked,
                     showNetwork: elements.showNetwork.checked,
                     showAudio: elements.showAudio.checked,
                     showBattery: elements.showBattery.checked,
@@ -928,6 +951,7 @@
                 const toggleIds = [
                     "showKomorebiWorkspaces",
                     "showSystray",
+                    "showWeather",
                     "showNetwork",
                     "showAudio",
                     "showBattery",
