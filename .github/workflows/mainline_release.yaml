@@ -49,7 +49,7 @@ jobs:
 
           curl -L -o "${PACKAGE_FILE}" "${PACKAGE_URL}"
           sudo apt-get update
-          sudo apt-get install -y "./${PACKAGE_FILE}"
+          sudo apt-get install -y xvfb "./${PACKAGE_FILE}"
 
       - name: Ensure main branch
         shell: bash
@@ -217,9 +217,13 @@ jobs:
           fi
 
           RELEASE_NOTES="$(cat release_body.txt)"
+          export XDG_RUNTIME_DIR="${RUNNER_TEMP}/zebar-runtime"
+          mkdir -p "${XDG_RUNTIME_DIR}"
+          chmod 700 "${XDG_RUNTIME_DIR}"
 
-          zebar publish \
-            --pack-config ./zpack.json \
-            --commit-sha "${COMMIT_SHA}" \
-            --release-url "${RELEASE_URL}" \
-            --release-notes "${RELEASE_NOTES}"
+          xvfb-run --auto-servernum --server-args='-screen 0 1280x720x24' \
+            zebar publish \
+              --pack-config ./zpack.json \
+              --commit-sha "${COMMIT_SHA}" \
+              --release-url "${RELEASE_URL}" \
+              --release-notes "${RELEASE_NOTES}"
