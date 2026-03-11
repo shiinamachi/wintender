@@ -17,6 +17,15 @@ Since this is a project primarily for personal use, issues that are reported may
   - Show wintender settings
 - Customizable
 
+## Screenshots
+![Top Bar](./images/preview_1.png)
+
+![Settings Screen](./images/preview_2.png)
+
+![Settings Screen](./images/preview_3.png)
+
+![Settings Screen](./images/preview_4.png)
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

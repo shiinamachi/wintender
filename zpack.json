@@ -4,6 +4,13 @@
     "version": "1.0.0",
     "description": "wintender top bar for Windows 11",
     "tags": ["status-bar"],
+    "repositoryUrl": "https://github.com/shiinamachi/wintender",
+    "previewImages": [
+        "./images/preview_1.png",
+        "./images/preview_2.png",
+        "./images/preview_3.png",
+        "./images/preview_4.png"
+    ],
     "widgets": [
         {
             "name": "top-bar",
