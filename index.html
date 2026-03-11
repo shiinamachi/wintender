@@ -225,7 +225,7 @@
                 <div id="systray" class="tray hidden"></div>
                 <div id="network" class="pill interactive hidden"></div>
                 <div id="audio" class="pill interactive hidden"></div>
-                <div id="battery" class="pill hidden"></div>
+                <div id="battery" class="pill interactive hidden"></div>
             </div>
         </div>
         <script type="module">
@@ -235,6 +235,8 @@
             const VOLUME_STEP = 5;
             const CELLULAR_SIGNAL_REFRESH_INTERVAL = 5000;
             const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
+            const QUICK_SETTINGS_POPUP_WIDTH = 420;
+            const QUICK_SETTINGS_POPUP_HEIGHT = 580;
             const KOMOREBIC_PROGRAM_CANDIDATES = [
                 "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
                 "C:\\Program Files\\komorebi\\bin\\komorebic.exe",
@@ -1088,6 +1090,59 @@
                 }
             }
 
+            function getQuickSettingsPlacement(anchorRect) {
+                const popupWidth = QUICK_SETTINGS_POPUP_WIDTH;
+                const popupHeight = QUICK_SETTINGS_POPUP_HEIGHT;
+                const offsetX = Math.max(
+                    8,
+                    Math.round(anchorRect.right - popupWidth),
+                );
+                const offsetY = Math.max(36, Math.round(anchorRect.bottom + 8));
+
+                return {
+                    anchor: "top_left",
+                    offsetX: `${offsetX}px`,
+                    offsetY: `${offsetY}px`,
+                    width: `${popupWidth}px`,
+                    height: `${popupHeight}px`,
+                    monitorSelection: { type: "primary" },
+                    dockToEdge: {
+                        enabled: false,
+                        edge: null,
+                        windowMargin: "0px",
+                    },
+                };
+            }
+
+            async function openQuickSettings(event) {
+                const button = event?.currentTarget;
+
+                if (!(button instanceof HTMLElement)) {
+                    return;
+                }
+
+                const current = zebar.currentWidget();
+                const placement = getQuickSettingsPlacement(
+                    button.getBoundingClientRect(),
+                );
+
+                try {
+                    await zebar.startWidget(
+                        "quick-settings",
+                        placement,
+                        { packId: current.packId },
+                    );
+                } catch (error) {
+                    console.error(
+                        "Dynamic quick settings launch failed, falling back to preset",
+                        error,
+                    );
+                    await zebar.startWidgetPreset("quick-settings", "default", {
+                        packId: current.packId,
+                    });
+                }
+            }
+
             function buildTrayButton(icon, systrayOutput) {
                 const button = document.createElement("button");
                 const image = document.createElement("img");
@@ -1297,8 +1352,8 @@
                 elements.network.appendChild(
                     textSpan("network-text", networkState.text),
                 );
-                elements.network.onclick = () => {
-                    void openNetworkFlyout();
+                elements.network.onclick = (event) => {
+                    void openQuickSettings(event);
                 };
                 toggleHidden(elements.network, false);
             }
@@ -1316,10 +1371,8 @@
 
                 elements.audio.appendChild(iconSpan(state.icon));
                 elements.audio.appendChild(textSpan("audio-text", state.text));
-                elements.audio.onclick = () => {
-                    audioOutput.setMute?.(!state.isMuted, {
-                        deviceId: state.deviceId,
-                    });
+                elements.audio.onclick = (event) => {
+                    void openQuickSettings(event);
                 };
                 elements.audio.onwheel = (event) => {
                     event.preventDefault();
@@ -1340,6 +1393,7 @@
             function renderBattery(batteryOutput) {
                 const state = getBatteryState(batteryOutput);
                 clearElement(elements.battery);
+                elements.battery.onclick = null;
                 elements.battery.classList.toggle("warning", false);
 
                 if (!state) {
@@ -1351,38 +1405,54 @@
                 elements.battery.appendChild(
                     textSpan("battery-text", state.text),
                 );
+                elements.battery.onclick = (event) => {
+                    void openQuickSettings(event);
+                };
                 elements.battery.classList.toggle("warning", state.isWarning);
                 toggleHidden(elements.battery, false);
             }
 
-            providers.onOutput((output) => {
-                if (output.komorebi) {
-                    state.latestKomorebiOutput = output.komorebi;
-                }
+            const TEST_HOOKS = {
+                elements,
+                getQuickSettingsPlacement,
+                openQuickSettings,
+                renderNetwork,
+                renderAudio,
+                renderBattery,
+            };
 
-                state.latestNetworkOutput = output.network;
-                renderKomorebi(output.komorebi ?? state.latestKomorebiOutput);
-                renderDate(output.date);
-                renderMedia(output.media);
-                renderSystray(output.systray);
-                renderNetwork(output.network);
-                refreshCellularSignalStrength(output.network);
-                renderAudio(output.audio);
-                renderBattery(output.battery);
-                void syncKomorebiState();
-            });
+            if (globalThis.__WINTENDER_TOP_BAR_TEST_MODE__) {
+                globalThis.__WINTENDER_TOP_BAR_TEST_HOOKS__ = TEST_HOOKS;
+            } else {
+                providers.onOutput((output) => {
+                    if (output.komorebi) {
+                        state.latestKomorebiOutput = output.komorebi;
+                    }
 
-            providers.onError((errorMap) => {
-                if (errorMap?.komorebi) {
-                    state.latestKomorebiOutput = null;
-                    renderKomorebi(null);
-                    void refreshKomorebiState();
-                }
+                    state.latestNetworkOutput = output.network;
+                    renderKomorebi(output.komorebi ?? state.latestKomorebiOutput);
+                    renderDate(output.date);
+                    renderMedia(output.media);
+                    renderSystray(output.systray);
+                    renderNetwork(output.network);
+                    refreshCellularSignalStrength(output.network);
+                    renderAudio(output.audio);
+                    renderBattery(output.battery);
+                    void syncKomorebiState();
+                });
 
-                console.error("Zebar provider error", errorMap);
-            });
+                providers.onError((errorMap) => {
+                    if (errorMap?.komorebi) {
+                        state.latestKomorebiOutput = null;
+                        renderKomorebi(null);
+                        void refreshKomorebiState();
+                    }
 
-            void refreshKomorebiState();
+                    console.error("Zebar provider error", errorMap);
+                });
+
+                void refreshKomorebiState();
+            }
         </script>
     </body>
 </html>

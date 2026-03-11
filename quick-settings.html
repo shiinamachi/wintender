@@ -1,0 +1,2197 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wintender Quick Settings</title>
+    <style>
+      :root {
+        --panel-bg: rgba(24, 24, 30, 0.94);
+        --panel-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+        --border: rgba(255, 255, 255, 0.06);
+        --text-primary: #e0e0e0;
+        --text-secondary: #808080;
+        --hover: rgba(255, 255, 255, 0.1);
+        --accent: #89b4fa;
+        --accent-dim: rgba(137, 180, 250, 0.15);
+        --warning: #f38ba8;
+        --card-bg: rgba(255, 255, 255, 0.04);
+        --active-bg: rgba(137, 180, 250, 0.2);
+        --active-border: rgba(137, 180, 250, 0.3);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        font-family:
+          "JetBrainsMonohangul NF Regular",
+          "JetBrainsMono Nerd Font",
+          "CaskaydiaCove Nerd Font",
+          "Segoe UI",
+          monospace;
+        color: var(--text-primary);
+        background: transparent;
+        user-select: none;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        color: inherit;
+        background: transparent;
+      }
+
+      .panel {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-height: 100vh;
+        min-height: 0;
+        background: var(--panel-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--panel-shadow);
+        overflow: hidden;
+      }
+
+      .panel-header,
+      .list-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 16px 0;
+        flex: 0 0 auto;
+      }
+
+      .header-copy,
+      .list-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .header-title,
+      .list-title {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .list-subtitle {
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+        flex: 0 0 auto;
+      }
+
+      .panel-body {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 14px;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 16px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+      }
+
+      .panel-body::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .panel-body::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .panel-body::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+      }
+
+      .icon-button,
+      .ghost-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 28px;
+        min-width: 28px;
+        padding: 0 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      .icon-button:hover,
+      .ghost-button:hover,
+      .action-tile:hover,
+      .list-button:hover {
+        background: var(--hover);
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .summary-card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+        padding: 10px;
+        border-radius: 12px;
+        background: var(--card-bg);
+      }
+
+      .summary-card--warning .summary-value {
+        color: var(--warning);
+      }
+
+      .summary-icon {
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      .summary-label {
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+
+      .summary-value,
+      .list-title-text,
+      .list-subtitle-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .summary-value {
+        font-size: 12px;
+        line-height: 1.35;
+        white-space: nowrap;
+      }
+
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .control-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--card-bg);
+      }
+
+      .control-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 78px;
+      }
+
+      .control-title {
+        font-size: 12px;
+      }
+
+      .control-value {
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+
+      .control-slider {
+        flex: 1 1 auto;
+        min-width: 0;
+        accent-color: var(--accent);
+      }
+
+      .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: minmax(78px, auto);
+        gap: 10px;
+      }
+
+      .action-tile {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 8px;
+        min-height: 78px;
+        padding: 10px;
+        border-radius: 12px;
+        background: var(--card-bg);
+        border: 1px solid transparent;
+        cursor: pointer;
+        text-align: left;
+        transition: background 0.15s ease, transform 0.15s ease;
+      }
+
+      .action-tile:active {
+        transform: translateY(1px);
+      }
+
+      .action-tile--active {
+        background: var(--active-bg);
+        border-color: var(--active-border);
+      }
+
+      .action-tile--active:hover {
+        background: rgba(137, 180, 250, 0.25);
+      }
+
+      .action-tile--loading {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+
+      .action-icon {
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      .action-label {
+        font-size: 12px;
+        line-height: 1.3;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .action-meta {
+        color: var(--text-secondary);
+        font-size: 11px;
+        line-height: 1.3;
+      }
+
+      .list-view {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+      }
+
+      .list-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .list-button {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--card-bg);
+        cursor: pointer;
+        text-align: left;
+        transition: background 0.15s ease;
+      }
+
+      .list-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .list-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .list-title-text,
+      .list-subtitle-text {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .list-title-text {
+        font-size: 12px;
+      }
+
+      .list-subtitle-text,
+      .list-tag,
+      .empty-state {
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+
+      .empty-state {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 180px;
+        text-align: center;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel" class="panel"></div>
+
+    <script type="module">
+      import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
+
+      const POWERSHELL_BASE_ARGS = [
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-Command",
+      ];
+      const SETTINGS_DEEP_LINKS = {
+        bluetooth: "ms-settings:bluetooth",
+        airplaneMode: "ms-settings:network-airplanemode",
+        mobileHotspot: "ms-settings:network-mobilehotspot",
+        energySaver: "ms-settings:batterysaver",
+        nightLight: "ms-settings:nightlight",
+        nearbySharing: "ms-settings:crossdevice",
+        outputDevice: "ms-settings:sound-devices",
+        studioEffects: "ms-settings:camera",
+        castProject: "ms-settings:project",
+        wifiSettings: "ms-settings:network-wifi",
+        cellularSettings: "ms-settings:network-cellular",
+        vpnSettings: "ms-settings:network-vpn",
+        display: "ms-settings:display",
+        focusAssist: "ms-settings:quiethours",
+        accessibility: "ms-settings:easeofaccess",
+      };
+      const ACCESSIBILITY_LINKS = [
+        {
+          icon: "󰍡",
+          label: "Narrator",
+          uri: "ms-settings:easeofaccess-narrator",
+        },
+        {
+          icon: "󰍹",
+          label: "Magnifier",
+          uri: "ms-settings:easeofaccess-magnifier",
+        },
+        {
+          icon: "󰸌",
+          label: "Color Filters",
+          uri: "ms-settings:easeofaccess-colorfilter",
+        },
+        {
+          icon: "󰌌",
+          label: "Keyboard",
+          uri: "ms-settings:easeofaccess-keyboard",
+        },
+      ];
+      const SUPPLEMENTAL_REFRESH_INTERVAL = 15000;
+      const VOLUME_STEP = 5;
+      const BRIGHTNESS_QUERY_SCRIPT =
+        "$ErrorActionPreference = 'Stop'; try { $value = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightness | Select-Object -First 1 -ExpandProperty CurrentBrightness; @{ supported = $true; value = [int]$value } | ConvertTo-Json -Compress } catch { @{ supported = $false; value = $null } | ConvertTo-Json -Compress }";
+      const VPN_QUERY_SCRIPT =
+        "$ErrorActionPreference = 'Stop'; try { $items = @(Get-VpnConnection | Select-Object -Property Name, ConnectionStatus); if ($items.Count -eq 0) { '[]' } else { $items | ConvertTo-Json -Compress } } catch { '[]' }";
+      const STUDIO_EFFECTS_QUERY_SCRIPT =
+        "$ErrorActionPreference = 'SilentlyContinue'; $camera = @(Get-CimInstance Win32_PnPEntity | Where-Object { $_.PNPClass -eq 'Camera' } | Select-Object -First 1); @{ supported = ($camera.Count -gt 0) } | ConvertTo-Json -Compress";
+      const TOGGLE_QUERY_SCRIPTS = {
+        bluetooth:
+          "$ErrorActionPreference = 'SilentlyContinue'; $adapter = Get-PnpDevice -Class Bluetooth | Where-Object { $_.InstanceId -match '^BTHENUM\\\\' } | Select-Object -First 1; @{ enabled = ($adapter -ne $null -and $adapter.Status -eq 'OK') } | ConvertTo-Json -Compress",
+        airplaneMode:
+          "$ErrorActionPreference = 'SilentlyContinue'; $path = 'HKLM:\\SYSTEM\\ControlSet001\\Control\\RadioManagement\\SystemRadioState'; try { $item = Get-ItemProperty $path -ErrorAction Stop; $value = $item.'(default)'; if ($null -eq $value) { $value = $item.'(Default)' }; @{ enabled = ($value -eq 1) } | ConvertTo-Json -Compress } catch { @{ enabled = $false } | ConvertTo-Json -Compress }",
+        mobileHotspot:
+          "$ErrorActionPreference = 'SilentlyContinue'; $adapter = Get-NetAdapter | Where-Object { $_.InterfaceDescription -match 'Microsoft Wi-Fi Direct Virtual Adapter' -and $_.Status -eq 'Up' } | Select-Object -First 1; @{ enabled = ($adapter -ne $null) } | ConvertTo-Json -Compress",
+        energySaver:
+          "$ErrorActionPreference = 'SilentlyContinue'; try { $value = (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power' -Name 'EnergySaverEnabled' -ErrorAction Stop).EnergySaverEnabled; @{ enabled = ($value -eq 1) } | ConvertTo-Json -Compress } catch { @{ enabled = $false } | ConvertTo-Json -Compress }",
+        nightLight:
+          "$ErrorActionPreference = 'SilentlyContinue'; $path = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.bluelightreductionstate\\windows.data.bluelightreduction.bluelightreductionstate'; $data = (Get-ItemProperty $path -ErrorAction SilentlyContinue).Data; if ($data -ne $null -and $data.Length -gt 18 -and $data[18] -eq 0x15) { @{ enabled = $true } | ConvertTo-Json -Compress } else { @{ enabled = $false } | ConvertTo-Json -Compress }",
+        focusAssist:
+          "$ErrorActionPreference = 'SilentlyContinue'; $path = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\Store\\DefaultAccount\\Current\\default$windows.data.shell.focusassist\\windows.data.shell.focusassist'; $data = (Get-ItemProperty $path -ErrorAction SilentlyContinue).Data; if ($data -ne $null -and $data.Length -gt 14 -and ($data[14] -eq 1 -or $data[14] -eq 2)) { @{ enabled = $true } | ConvertTo-Json -Compress } else { @{ enabled = $false } | ConvertTo-Json -Compress }",
+      };
+
+      const panel = document.getElementById("panel");
+      const widget = zebar.currentWidget();
+      const providers = zebar.createProviderGroup({
+        battery: { type: "battery", refreshInterval: 10000 },
+        network: { type: "network", refreshInterval: 5000 },
+        audio: { type: "audio" },
+      });
+      const state = {
+        output: {
+          battery: null,
+          network: null,
+          audio: null,
+        },
+        view: "main",
+        brightness: {
+          supported: false,
+          value: 50,
+          isLoading: true,
+        },
+        wifi: {
+          items: [],
+          isLoading: false,
+          lastUpdatedAt: 0,
+        },
+        cellular: {
+          interfaces: [],
+          profiles: [],
+          activeInterfaceName: "",
+          isConnected: false,
+          isLoading: false,
+          lastUpdatedAt: 0,
+        },
+        vpn: {
+          items: [],
+          isLoading: false,
+          lastUpdatedAt: 0,
+        },
+        toggles: {
+          bluetooth: { enabled: false, isLoading: true },
+          airplaneMode: { enabled: false, isLoading: true },
+          mobileHotspot: { enabled: false, isLoading: true },
+          energySaver: { enabled: false, isLoading: true },
+          nightLight: { enabled: false, isLoading: true },
+          focusAssist: { enabled: false, isLoading: true },
+        },
+        studioEffects: {
+          supported: false,
+          isLoading: true,
+        },
+      };
+      let supplementalRefreshTimer = null;
+      let lastRenderedView = null;
+
+      function clearElement(element) {
+        while (element.firstChild) {
+          element.removeChild(element.firstChild);
+        }
+      }
+
+      function clamp(value, min, max) {
+        const number = Number(value);
+
+        if (!Number.isFinite(number)) {
+          return min;
+        }
+
+        return Math.min(Math.max(number, min), max);
+      }
+
+      function normalizeText(text) {
+        return typeof text === "string" ? text.trim() : "";
+      }
+
+      function quotePowerShellScript(script) {
+        return `"${String(script).replace(/"/g, '\\"')}"`;
+      }
+
+      function buildPowerShellArgs(script) {
+        return `${POWERSHELL_BASE_ARGS.join(" ")} ${quotePowerShellScript(script)}`;
+      }
+
+      function buildPowerShellSpawnArgs(script) {
+        return [...POWERSHELL_BASE_ARGS, script];
+      }
+
+      function escapeDoubleQuotes(value) {
+        return String(value ?? "").replace(/"/g, '""');
+      }
+
+      function getSignalStrengthValue(...candidates) {
+        for (const candidate of candidates) {
+          const value =
+            typeof candidate === "string" ? Number(candidate) : candidate;
+
+          if (Number.isFinite(value)) {
+            return clamp(value, 0, 100);
+          }
+        }
+
+        return null;
+      }
+
+      function getSignalLevel(signalStrength) {
+        if (!Number.isFinite(signalStrength)) {
+          return null;
+        }
+
+        if (signalStrength < 25) {
+          return 0;
+        }
+
+        if (signalStrength < 50) {
+          return 1;
+        }
+
+        if (signalStrength < 75) {
+          return 2;
+        }
+
+        return 3;
+      }
+
+      function getWifiSignalIcon(signalStrength) {
+        const level = getSignalLevel(signalStrength);
+        const icons = ["󰤟", "󰤢", "󰤥", "󰤨"];
+
+        return level === null ? "󰤨" : icons[level];
+      }
+
+      function getCellularSignalIcon(signalStrength) {
+        const level = getSignalLevel(signalStrength);
+        const icons = ["󰢿", "󰢼", "󰢽", "󰢾"];
+
+        return level === null ? "󰢿" : icons[level];
+      }
+
+      function ensureArray(value) {
+        if (Array.isArray(value)) {
+          return value;
+        }
+
+        return value ? [value] : [];
+      }
+
+      function parseJson(stdout) {
+        const text = normalizeText(stdout);
+
+        if (!text) {
+          return null;
+        }
+
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          console.error("Failed to parse JSON shell output", error);
+          return null;
+        }
+      }
+
+      function isCellularInterfaceType(interfaceType) {
+        return (
+          interfaceType === "mobile_broadband" ||
+          interfaceType === "generic_modem" ||
+          interfaceType === "ppp"
+        );
+      }
+
+      function getDefaultInterface(networkOutput) {
+        return networkOutput?.defaultInterface ?? null;
+      }
+
+      function getBatterySummary(batteryOutput) {
+        if (
+          !batteryOutput ||
+          typeof batteryOutput.chargePercent !== "number"
+        ) {
+          return null;
+        }
+
+        const percent = Math.round(batteryOutput.chargePercent);
+        let icon = "󰁹";
+
+        if (batteryOutput.isCharging) {
+          icon = "󰂄";
+        } else if (percent >= 90) {
+          icon = "󰁹";
+        } else if (percent >= 60) {
+          icon = "󰂁";
+        } else if (percent >= 30) {
+          icon = "󰁾";
+        } else if (percent >= 10) {
+          icon = "󰁻";
+        } else {
+          icon = "󰂎";
+        }
+
+        return {
+          icon,
+          label: "Battery",
+          value: `${percent}%`,
+          warning: !batteryOutput.isCharging && percent < 10,
+        };
+      }
+
+      function getAudioSummary(audioOutput) {
+        const device = audioOutput?.defaultPlaybackDevice ?? null;
+
+        if (!device) {
+          return null;
+        }
+
+        const volume = clamp(Math.round(device.volume ?? 0), 0, 100);
+        const isMuted = Boolean(device.isMuted) || volume === 0;
+        let icon = "󰕾";
+
+        if (isMuted) {
+          icon = "󰖁";
+        } else if (volume <= 33) {
+          icon = "󰕿";
+        } else if (volume <= 66) {
+          icon = "󰖀";
+        }
+
+        return {
+          icon,
+          label: "Audio",
+          value: `${volume}%`,
+          volume,
+          isMuted,
+          deviceId: device.deviceId,
+          deviceName: normalizeText(device.friendlyName) || "Playback",
+        };
+      }
+
+      function getNetworkSummary(networkOutput) {
+        const defaultInterface = getDefaultInterface(networkOutput);
+        const gateway = networkOutput?.defaultGateway ?? null;
+
+        if (!defaultInterface) {
+          return {
+            icon: "󰤭",
+            label: "Network",
+            value: "No Network",
+            kind: "none",
+          };
+        }
+
+        if (defaultInterface.type === "wifi") {
+          const signalStrength = getSignalStrengthValue(
+            gateway?.signalStrength,
+            defaultInterface.signalStrength,
+            defaultInterface.signalPercent,
+          );
+
+          return {
+            icon: getWifiSignalIcon(signalStrength),
+            label: "Network",
+            value:
+              normalizeText(gateway?.ssid) ||
+              normalizeText(defaultInterface.friendlyName) ||
+              "Wi-Fi",
+            kind: "wifi",
+          };
+        }
+
+        if (defaultInterface.type === "ethernet") {
+          return {
+            icon: "󰈀",
+            label: "Network",
+            value: "Ethernet",
+            kind: "ethernet",
+          };
+        }
+
+        if (isCellularInterfaceType(defaultInterface.type)) {
+          const signalStrength = getSignalStrengthValue(
+            defaultInterface.signalStrength,
+            defaultInterface.signalPercent,
+          );
+
+          return {
+            icon: getCellularSignalIcon(signalStrength),
+            label: "Network",
+            value:
+              normalizeText(defaultInterface.friendlyName) ||
+              normalizeText(defaultInterface.description) ||
+              normalizeText(defaultInterface.name) ||
+              "Cellular",
+            kind: "cellular",
+          };
+        }
+
+        return {
+          icon: "󰤭",
+          label: "Network",
+          value:
+            normalizeText(defaultInterface.friendlyName) ||
+            normalizeText(defaultInterface.name) ||
+            "No Network",
+          kind: "other",
+        };
+      }
+
+      function getCellularSummary(networkOutput, cellularState) {
+        const defaultInterface = getDefaultInterface(networkOutput);
+        const activeName =
+          normalizeText(defaultInterface?.friendlyName) ||
+          normalizeText(defaultInterface?.description) ||
+          normalizeText(defaultInterface?.name) ||
+          normalizeText(cellularState.activeInterfaceName);
+        const activeInterface =
+          cellularState.interfaces.find(
+            (item) => normalizeText(item.name) === activeName,
+          ) ?? cellularState.interfaces[0];
+        const signalStrength = getSignalStrengthValue(
+          activeInterface?.signalStrength,
+          defaultInterface?.signalStrength,
+          defaultInterface?.signalPercent,
+        );
+        const isConnected =
+          isCellularInterfaceType(defaultInterface?.type) ||
+          Boolean(cellularState.isConnected);
+
+        if (!activeName && !cellularState.interfaces.length) {
+          return null;
+        }
+
+        return {
+          icon: getCellularSignalIcon(signalStrength),
+          label: "Cellular",
+          value:
+            activeName ||
+            normalizeText(activeInterface?.description) ||
+            "Cellular",
+          meta: isConnected
+            ? "Connected"
+            : normalizeText(activeInterface?.state) || "Available",
+          isConnected,
+        };
+      }
+
+      function buildBrightnessSetScript(value) {
+        const nextValue = clamp(Math.round(value), 0, 100);
+
+        return `$ErrorActionPreference = 'Stop'; Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{ Brightness = ${nextValue}; Timeout = 0 } | Out-Null`;
+      }
+
+      function buildBluetoothToggleScript(nextEnabled) {
+        const command = nextEnabled ? "Enable-PnpDevice" : "Disable-PnpDevice";
+
+        return `$ErrorActionPreference = 'Stop'; Get-PnpDevice -Class Bluetooth | Where-Object { $_.InstanceId -match '^BTHENUM\\\\' } | ${command} -Confirm:$false | Out-Null`;
+      }
+
+      function buildMobileHotspotToggleScript() {
+        return "$ErrorActionPreference = 'Stop'; $profile = [Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime]::GetInternetConnectionProfile(); if ($null -eq $profile) { throw 'No active connection profile' }; $manager = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager,Windows.Networking.NetworkOperators,ContentType=WindowsRuntime]::CreateFromConnectionProfile($profile); if ($manager.TetheringOperationalState.ToString() -eq 'On') { $manager.StopTetheringAsync().AsTask().GetAwaiter().GetResult() | Out-Null } else { $manager.StartTetheringAsync().AsTask().GetAwaiter().GetResult() | Out-Null }";
+      }
+
+      function buildEnergySaverToggleScript(nextEnabled) {
+        return `$ErrorActionPreference = 'Stop'; Set-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power' -Name 'EnergySaverEnabled' -Value ${nextEnabled ? 1 : 0}`;
+      }
+
+      async function execPowerShell(script) {
+        return zebar.shellExec("powershell.exe", buildPowerShellArgs(script));
+      }
+
+      async function openSettings(uri, message) {
+        try {
+          await zebar.shellSpawn(
+            "powershell.exe",
+            buildPowerShellSpawnArgs(`Start-Process '${uri}'`),
+          );
+
+          if (message) {
+            console.info(message);
+          }
+        } catch (error) {
+          console.error("Failed to open settings link", error);
+        }
+      }
+
+      function parseWifiNetworks(stdout, networkOutput) {
+        const lines = String(stdout || "").split(/\r?\n/);
+        const connectedSsid = normalizeText(networkOutput?.defaultGateway?.ssid);
+        const items = [];
+        let current = null;
+
+        lines.forEach((line) => {
+          const ssidMatch = line.match(/^\s*SSID\s+\d+\s*:\s*(.*)$/i);
+
+          if (ssidMatch) {
+            const ssid = normalizeText(ssidMatch[1]);
+
+            if (!ssid) {
+              current = null;
+              return;
+            }
+
+            current = {
+              id: ssid.toLowerCase(),
+              ssid,
+              signalStrength: null,
+              isConnected: connectedSsid === ssid,
+            };
+            items.push(current);
+            return;
+          }
+
+          const signalMatch = line.match(/^\s*Signal\s*:\s*(\d+)%\s*$/i);
+
+          if (signalMatch && current && current.signalStrength === null) {
+            current.signalStrength = clamp(Number(signalMatch[1]), 0, 100);
+          }
+        });
+
+        const unique = new Map();
+
+        items.forEach((item) => {
+          const previous = unique.get(item.id);
+
+          if (
+            !previous ||
+            (item.signalStrength ?? -1) > (previous.signalStrength ?? -1)
+          ) {
+            unique.set(item.id, item);
+          }
+        });
+
+        return Array.from(unique.values()).sort((left, right) => {
+          if (left.isConnected !== right.isConnected) {
+            return left.isConnected ? -1 : 1;
+          }
+
+          return (right.signalStrength ?? -1) - (left.signalStrength ?? -1);
+        });
+      }
+
+      function parseCellularInterfaces(stdout, networkOutput) {
+        const lines = String(stdout || "").split(/\r?\n/);
+        const defaultInterface = getDefaultInterface(networkOutput);
+        const activeName =
+          normalizeText(defaultInterface?.friendlyName) ||
+          normalizeText(defaultInterface?.description) ||
+          normalizeText(defaultInterface?.name);
+        const interfaces = [];
+        let current = null;
+
+        lines.forEach((line) => {
+          const match = line.match(/^\s*([^:]+?)\s*:\s*(.*?)\s*$/);
+
+          if (!match) {
+            return;
+          }
+
+          const key = normalizeText(match[1]).toLowerCase();
+          const value = normalizeText(match[2]);
+
+          if (key === "name") {
+            current = {
+              name: value,
+              description: "",
+              state: "",
+              signalStrength: null,
+              isConnected: value === activeName,
+            };
+            interfaces.push(current);
+            return;
+          }
+
+          if (!current) {
+            return;
+          }
+
+          if (key === "description") {
+            current.description = value;
+          } else if (key === "state") {
+            current.state = value;
+            current.isConnected =
+              current.isConnected ||
+              normalizeText(value).toLowerCase() === "connected";
+          } else if (key === "signal") {
+            const signalMatch = value.match(/(\d+)%/);
+            current.signalStrength = signalMatch
+              ? clamp(Number(signalMatch[1]), 0, 100)
+              : null;
+          }
+        });
+
+        return interfaces;
+      }
+
+      function parseCellularProfiles(stdout, interfaceName, isConnected) {
+        const lines = String(stdout || "").split(/\r?\n/);
+        const profiles = [];
+        const seen = new Set();
+
+        lines.forEach((line) => {
+          const match = line.match(
+            /^\s*(?:profile(?:\s+name)?|name)\s*:\s*(.+)$/i,
+          );
+
+          if (!match) {
+            return;
+          }
+
+          const name = normalizeText(match[1]);
+
+          if (!name || seen.has(name.toLowerCase())) {
+            return;
+          }
+
+          seen.add(name.toLowerCase());
+          profiles.push({
+            interfaceName,
+            name,
+            isConnected,
+          });
+        });
+
+        return profiles;
+      }
+
+      function hasCellularCapability(networkOutput, cellularState) {
+        if (cellularState.interfaces.length > 0) {
+          return true;
+        }
+
+        return isCellularInterfaceType(getDefaultInterface(networkOutput)?.type);
+      }
+
+      function getToggleMeta(toggleState, activeText = "On", inactiveText = "Off") {
+        if (toggleState?.isLoading) {
+          return "Loading";
+        }
+
+        return toggleState?.enabled ? activeText : inactiveText;
+      }
+
+      function getMainActionTiles(snapshot) {
+        const source = snapshot ?? state;
+        const networkSummary = getNetworkSummary(source.output?.network);
+        const batterySummary = getBatterySummary(source.output?.battery);
+        const audioSummary = getAudioSummary(source.output?.audio);
+        const cellularSummary = getCellularSummary(
+          source.output?.network,
+          source.cellular,
+        );
+        const items = [
+          {
+            action: "view:wifi",
+            icon:
+              networkSummary.kind === "wifi"
+                ? networkSummary.icon
+                : getWifiSignalIcon(null),
+            label: "Wi-Fi",
+            meta: networkSummary.kind === "wifi" ? networkSummary.value : "Networks",
+            isActive: networkSummary.kind === "wifi",
+            isLoading: source.wifi?.isLoading ?? false,
+          },
+          {
+            action: "toggle:bluetooth",
+            icon: source.toggles.bluetooth.enabled ? "󰂯" : "󰂲",
+            label: "Bluetooth",
+            meta: getToggleMeta(source.toggles.bluetooth),
+            isActive: source.toggles.bluetooth.enabled,
+            isLoading: source.toggles.bluetooth.isLoading,
+          },
+          {
+            action: "toggle:airplaneMode",
+            icon: "󰀝",
+            label: "Airplane Mode",
+            meta: getToggleMeta(source.toggles.airplaneMode),
+            isActive: source.toggles.airplaneMode.enabled,
+            isLoading: source.toggles.airplaneMode.isLoading,
+          },
+          ...(hasCellularCapability(source.output?.network, source.cellular)
+            ? [
+                {
+                  action: "view:cellular",
+                  icon: cellularSummary?.icon ?? "󰢾",
+                  label: "Cellular",
+                  meta:
+                    cellularSummary?.meta ??
+                    (source.cellular?.isLoading ? "Loading" : "Profiles"),
+                  isActive: Boolean(cellularSummary?.isConnected),
+                  isLoading: source.cellular?.isLoading ?? false,
+                },
+              ]
+            : []),
+          {
+            action: "view:vpn",
+            icon: source.vpn.items.some((item) => item.isConnected)
+              ? "󰯄"
+              : "󰌆",
+            label: "VPN",
+            meta: source.vpn.items.some((item) => item.isConnected)
+              ? "Connected"
+              : source.vpn?.isLoading
+                ? "Loading"
+                : "Profiles",
+            isActive: source.vpn.items.some((item) => item.isConnected),
+            isLoading: source.vpn?.isLoading ?? false,
+          },
+          {
+            action: "toggle:mobileHotspot",
+            icon: "󰖩",
+            label: "Mobile Hotspot",
+            meta: getToggleMeta(source.toggles.mobileHotspot),
+            isActive: source.toggles.mobileHotspot.enabled,
+            isLoading: source.toggles.mobileHotspot.isLoading,
+          },
+          ...(batterySummary
+            ? [
+                {
+                  action: "toggle:energySaver",
+                  icon: "󰚥",
+                  label: "Energy Saver",
+                  meta: getToggleMeta(source.toggles.energySaver),
+                  isActive: source.toggles.energySaver.enabled,
+                  isLoading: source.toggles.energySaver.isLoading,
+                },
+              ]
+            : []),
+          {
+            action: "toggle:nightLight",
+            icon: source.toggles.nightLight.enabled ? "󰖙" : "󰖛",
+            label: "Night Light",
+            meta: getToggleMeta(source.toggles.nightLight),
+            isActive: source.toggles.nightLight.enabled,
+            isLoading: source.toggles.nightLight.isLoading,
+          },
+          {
+            action: "toggle:focusAssist",
+            icon: source.toggles.focusAssist.enabled ? "󰍶" : "󰍷",
+            label: "Focus Assist",
+            meta: getToggleMeta(source.toggles.focusAssist),
+            isActive: source.toggles.focusAssist.enabled,
+            isLoading: source.toggles.focusAssist.isLoading,
+          },
+          {
+            action: "settings:nearbySharing",
+            icon: "󰇯",
+            label: "Nearby Sharing",
+            meta: "Settings",
+            isActive: false,
+            isLoading: false,
+          },
+          {
+            action: "settings:outputDevice",
+            icon: "󰕾",
+            label: "Output Device",
+            meta: audioSummary?.deviceName || "Settings",
+            isActive: false,
+            isLoading: false,
+          },
+          {
+            action: "settings:castProject",
+            icon: "󰍹",
+            label: "Cast / Project",
+            meta: "Settings",
+            isActive: false,
+            isLoading: false,
+          },
+          {
+            action: "view:accessibility",
+            icon: "󰂯",
+            label: "Accessibility",
+            meta: "Links",
+            isActive: false,
+            isLoading: false,
+          },
+          ...(!source.studioEffects.isLoading && source.studioEffects.supported
+            ? [
+                {
+                  action: "settings:studioEffects",
+                  icon: "󱂛",
+                  label: "Studio Effects",
+                  meta: "Settings",
+                  isActive: false,
+                  isLoading: false,
+                },
+              ]
+            : []),
+        ];
+
+        return items;
+      }
+
+      async function refreshBrightness() {
+        state.brightness.isLoading = true;
+        render();
+
+        try {
+          const result = await execPowerShell(BRIGHTNESS_QUERY_SCRIPT);
+          const payload = parseJson(result.stdout);
+
+          state.brightness.supported = Boolean(payload?.supported);
+          if (Number.isFinite(Number(payload?.value))) {
+            state.brightness.value = clamp(Number(payload.value), 0, 100);
+          }
+        } catch (error) {
+          console.error("Failed to query brightness", error);
+          state.brightness.supported = false;
+        } finally {
+          state.brightness.isLoading = false;
+          render();
+        }
+      }
+
+      async function refreshWifiNetworks(force = false) {
+        const now = Date.now();
+
+        if (
+          !force &&
+          state.wifi.lastUpdatedAt &&
+          now - state.wifi.lastUpdatedAt < SUPPLEMENTAL_REFRESH_INTERVAL
+        ) {
+          return;
+        }
+
+        state.wifi.isLoading = true;
+        render();
+
+        try {
+          const result = await zebar.shellExec(
+            "netsh.exe",
+            "wlan show networks mode=bssid",
+          );
+
+          state.wifi.items = parseWifiNetworks(result.stdout, state.output.network);
+          state.wifi.lastUpdatedAt = Date.now();
+        } catch (error) {
+          console.error("Failed to query Wi-Fi networks", error);
+          state.wifi.items = [];
+        } finally {
+          state.wifi.isLoading = false;
+          render();
+        }
+      }
+
+      async function refreshCellularState(force = false) {
+        const now = Date.now();
+
+        if (
+          !force &&
+          state.cellular.lastUpdatedAt &&
+          now - state.cellular.lastUpdatedAt < SUPPLEMENTAL_REFRESH_INTERVAL
+        ) {
+          return;
+        }
+
+        state.cellular.isLoading = true;
+        render();
+
+        try {
+          const result = await zebar.shellExec("netsh.exe", "mbn show interfaces");
+          const interfaces = parseCellularInterfaces(
+            result.stdout,
+            state.output.network,
+          );
+          const profiles = [];
+
+          for (const item of interfaces) {
+            try {
+              const profileResult = await zebar.shellExec(
+                "netsh.exe",
+                `mbn show profiles interface="${escapeDoubleQuotes(item.name)}"`,
+              );
+
+              profiles.push(
+                ...parseCellularProfiles(
+                  profileResult.stdout,
+                  item.name,
+                  item.isConnected,
+                ),
+              );
+            } catch (error) {
+              console.error("Failed to query cellular profiles", error);
+            }
+          }
+
+          const connectedInterface =
+            interfaces.find((item) => item.isConnected) ?? interfaces[0] ?? null;
+
+          state.cellular.interfaces = interfaces;
+          state.cellular.profiles = profiles;
+          state.cellular.activeInterfaceName = normalizeText(
+            connectedInterface?.name,
+          );
+          state.cellular.isConnected = Boolean(connectedInterface?.isConnected);
+          state.cellular.lastUpdatedAt = Date.now();
+        } catch (error) {
+          console.error("Failed to query cellular state", error);
+          state.cellular.interfaces = [];
+          state.cellular.profiles = [];
+          state.cellular.activeInterfaceName = "";
+          state.cellular.isConnected = false;
+        } finally {
+          state.cellular.isLoading = false;
+          render();
+        }
+      }
+
+      async function refreshVpnConnections(force = false) {
+        const now = Date.now();
+
+        if (
+          !force &&
+          state.vpn.lastUpdatedAt &&
+          now - state.vpn.lastUpdatedAt < SUPPLEMENTAL_REFRESH_INTERVAL
+        ) {
+          return;
+        }
+
+        state.vpn.isLoading = true;
+        render();
+
+        try {
+          const result = await execPowerShell(VPN_QUERY_SCRIPT);
+          const payload = parseJson(result.stdout);
+
+          state.vpn.items = ensureArray(payload).map((item) => ({
+            name: normalizeText(item?.Name) || "VPN",
+            isConnected:
+              normalizeText(item?.ConnectionStatus).toLowerCase() === "connected",
+          }));
+          state.vpn.lastUpdatedAt = Date.now();
+        } catch (error) {
+          console.error("Failed to query VPN connections", error);
+          state.vpn.items = [];
+        } finally {
+          state.vpn.isLoading = false;
+          render();
+        }
+      }
+
+      async function refreshStudioEffectsSupport() {
+        state.studioEffects.isLoading = true;
+        render();
+
+        try {
+          const result = await execPowerShell(STUDIO_EFFECTS_QUERY_SCRIPT);
+          const payload = parseJson(result.stdout);
+
+          state.studioEffects.supported = Boolean(payload?.supported);
+        } catch (error) {
+          console.error("Failed to query Studio Effects support", error);
+          state.studioEffects.supported = false;
+        } finally {
+          state.studioEffects.isLoading = false;
+          render();
+        }
+      }
+
+      async function refreshToggleStates() {
+        Object.values(state.toggles).forEach((toggleState) => {
+          toggleState.isLoading = true;
+        });
+        render();
+
+        const results = await Promise.allSettled(
+          Object.entries(TOGGLE_QUERY_SCRIPTS).map(async ([key, script]) => {
+            const result = await execPowerShell(script);
+            const payload = parseJson(result.stdout);
+
+            return {
+              key,
+              enabled: Boolean(payload?.enabled),
+            };
+          }),
+        );
+
+        results.forEach((result) => {
+          if (result.status === "fulfilled") {
+            const { key, enabled } = result.value;
+            state.toggles[key].enabled = enabled;
+          }
+
+          const key =
+            result.status === "fulfilled"
+              ? result.value.key
+              : Object.keys(TOGGLE_QUERY_SCRIPTS)[results.indexOf(result)];
+
+          if (key && state.toggles[key]) {
+            state.toggles[key].isLoading = false;
+          }
+        });
+
+        render();
+      }
+
+      async function setBrightness(value) {
+        const nextValue = clamp(value, 0, 100);
+
+        state.brightness.value = nextValue;
+        render();
+
+        try {
+          await execPowerShell(buildBrightnessSetScript(nextValue));
+        } catch (error) {
+          console.error("Failed to set brightness", error);
+          await openSettings(
+            SETTINGS_DEEP_LINKS.display,
+            "Opening display settings instead",
+          );
+        }
+      }
+
+      async function setVolume(value) {
+        const audioSummary = getAudioSummary(state.output.audio);
+
+        if (!audioSummary) {
+          return;
+        }
+
+        state.output.audio.setVolume?.(clamp(value, 0, 100), {
+          deviceId: audioSummary.deviceId,
+        });
+      }
+
+      async function adjustVolume(delta) {
+        const audioSummary = getAudioSummary(state.output.audio);
+
+        if (!audioSummary) {
+          return;
+        }
+
+        await setVolume(audioSummary.volume + delta);
+      }
+
+      async function toggleMute() {
+        const audioSummary = getAudioSummary(state.output.audio);
+
+        if (!audioSummary) {
+          return;
+        }
+
+        state.output.audio.setMute?.(!audioSummary.isMuted, {
+          deviceId: audioSummary.deviceId,
+        });
+      }
+
+      async function connectWifi(ssid) {
+        try {
+          const safeSsid = escapeDoubleQuotes(ssid);
+          await zebar.shellExec(
+            "netsh.exe",
+            `wlan connect name="${safeSsid}" ssid="${safeSsid}"`,
+          );
+          await refreshWifiNetworks(true);
+        } catch (error) {
+          console.error("Failed to connect Wi-Fi network", error);
+          await openSettings(
+            SETTINGS_DEEP_LINKS.wifiSettings,
+            "Opening Wi-Fi settings instead",
+          );
+        }
+      }
+
+      async function connectCellular(profile) {
+        try {
+          await zebar.shellExec(
+            "netsh.exe",
+            `mbn connect interface="${escapeDoubleQuotes(profile.interfaceName)}" connmode=name name="${escapeDoubleQuotes(profile.name)}"`,
+          );
+          await refreshCellularState(true);
+        } catch (error) {
+          console.error("Failed to connect cellular profile", error);
+          await openSettings(
+            SETTINGS_DEEP_LINKS.cellularSettings,
+            "Opening Cellular settings instead",
+          );
+        }
+      }
+
+      async function disconnectCellular(interfaceName) {
+        try {
+          await zebar.shellExec(
+            "netsh.exe",
+            `mbn disconnect interface="${escapeDoubleQuotes(interfaceName)}"`,
+          );
+          await refreshCellularState(true);
+        } catch (error) {
+          console.error("Failed to disconnect cellular interface", error);
+          await openSettings(
+            SETTINGS_DEEP_LINKS.cellularSettings,
+            "Opening Cellular settings instead",
+          );
+        }
+      }
+
+      async function toggleVpnConnection(connection) {
+        try {
+          const args = connection.isConnected
+            ? `"${escapeDoubleQuotes(connection.name)}" /disconnect`
+            : `"${escapeDoubleQuotes(connection.name)}"`;
+          await zebar.shellExec("rasdial.exe", args);
+          await refreshVpnConnections(true);
+        } catch (error) {
+          console.error("Failed to toggle VPN connection", error);
+          await openSettings(
+            SETTINGS_DEEP_LINKS.vpnSettings,
+            "Opening VPN settings instead",
+          );
+        }
+      }
+
+      async function withToggleLoading(name, task) {
+        state.toggles[name].isLoading = true;
+        render();
+
+        try {
+          await task();
+        } finally {
+          state.toggles[name].isLoading = false;
+          render();
+          void refreshToggleStates();
+        }
+      }
+
+      async function toggleBluetooth() {
+        const nextEnabled = !state.toggles.bluetooth.enabled;
+
+        await withToggleLoading("bluetooth", async () => {
+          try {
+            await execPowerShell(buildBluetoothToggleScript(nextEnabled));
+            state.toggles.bluetooth.enabled = nextEnabled;
+          } catch (error) {
+            console.error("Failed to toggle Bluetooth", error);
+            await openSettings(
+              SETTINGS_DEEP_LINKS.bluetooth,
+              "Opening Bluetooth settings instead",
+            );
+          }
+        });
+      }
+
+      async function toggleAirplaneMode() {
+        await withToggleLoading("airplaneMode", async () => {
+          await openSettings(
+            SETTINGS_DEEP_LINKS.airplaneMode,
+            "Opening Airplane mode settings instead",
+          );
+        });
+      }
+
+      async function toggleMobileHotspot() {
+        await withToggleLoading("mobileHotspot", async () => {
+          try {
+            await execPowerShell(buildMobileHotspotToggleScript());
+            state.toggles.mobileHotspot.enabled =
+              !state.toggles.mobileHotspot.enabled;
+          } catch (error) {
+            console.error("Failed to toggle Mobile Hotspot", error);
+            await openSettings(
+              SETTINGS_DEEP_LINKS.mobileHotspot,
+              "Opening Mobile Hotspot settings instead",
+            );
+          }
+        });
+      }
+
+      async function toggleEnergySaver() {
+        const nextEnabled = !state.toggles.energySaver.enabled;
+
+        await withToggleLoading("energySaver", async () => {
+          try {
+            await execPowerShell(buildEnergySaverToggleScript(nextEnabled));
+            state.toggles.energySaver.enabled = nextEnabled;
+          } catch (error) {
+            console.error("Failed to toggle Energy Saver", error);
+            await openSettings(
+              SETTINGS_DEEP_LINKS.energySaver,
+              "Opening Energy Saver settings instead",
+            );
+          }
+        });
+      }
+
+      async function toggleNightLight() {
+        await withToggleLoading("nightLight", async () => {
+          await openSettings(
+            SETTINGS_DEEP_LINKS.nightLight,
+            "Opening Night Light settings instead",
+          );
+        });
+      }
+
+      async function toggleFocusAssist() {
+        await withToggleLoading("focusAssist", async () => {
+          await openSettings(
+            SETTINGS_DEEP_LINKS.focusAssist,
+            "Opening Focus Assist settings instead",
+          );
+        });
+      }
+
+      function setView(view) {
+        state.view = view;
+        render();
+
+        if (view === "wifi") {
+          void refreshWifiNetworks();
+        } else if (view === "cellular") {
+          void refreshCellularState();
+        } else if (view === "vpn") {
+          void refreshVpnConnections();
+        }
+      }
+
+      async function handleTileAction(action) {
+        switch (action) {
+          case "view:wifi":
+            setView("wifi");
+            return;
+          case "view:cellular":
+            setView("cellular");
+            return;
+          case "view:vpn":
+            setView("vpn");
+            return;
+          case "view:accessibility":
+            setView("accessibility");
+            return;
+          case "toggle:bluetooth":
+            await toggleBluetooth();
+            return;
+          case "toggle:airplaneMode":
+            await toggleAirplaneMode();
+            return;
+          case "toggle:mobileHotspot":
+            await toggleMobileHotspot();
+            return;
+          case "toggle:energySaver":
+            await toggleEnergySaver();
+            return;
+          case "toggle:nightLight":
+            await toggleNightLight();
+            return;
+          case "toggle:focusAssist":
+            await toggleFocusAssist();
+            return;
+          case "settings:nearbySharing":
+            await openSettings(SETTINGS_DEEP_LINKS.nearbySharing);
+            return;
+          case "settings:outputDevice":
+            await openSettings(SETTINGS_DEEP_LINKS.outputDevice);
+            return;
+          case "settings:castProject":
+            await openSettings(SETTINGS_DEEP_LINKS.castProject);
+            return;
+          case "settings:studioEffects":
+            await openSettings(SETTINGS_DEEP_LINKS.studioEffects);
+            return;
+          default:
+            return;
+        }
+      }
+
+      function createIconButton(icon, title, onClick) {
+        const button = document.createElement("button");
+
+        button.className = "icon-button";
+        button.type = "button";
+        button.title = title;
+        button.textContent = icon;
+        button.addEventListener("click", onClick);
+
+        return button;
+      }
+
+      function createSummaryCard({ icon, label, value, warning = false }) {
+        const card = document.createElement("div");
+        const glyph = document.createElement("div");
+        const labelElement = document.createElement("div");
+        const valueElement = document.createElement("div");
+
+        card.className = warning ? "summary-card summary-card--warning" : "summary-card";
+        glyph.className = "summary-icon";
+        glyph.textContent = icon;
+        labelElement.className = "summary-label";
+        labelElement.textContent = label;
+        valueElement.className = "summary-value";
+        valueElement.textContent = value;
+        card.append(glyph, labelElement, valueElement);
+
+        return card;
+      }
+
+      function createControlCard({
+        icon,
+        title,
+        value,
+        min = 0,
+        max = 100,
+        currentValue = 0,
+        onInput,
+        inputEventName = "input",
+        trailingButton = null,
+        disabled = false,
+      }) {
+        const card = document.createElement("div");
+        const glyph = document.createElement("div");
+        const copy = document.createElement("div");
+        const titleElement = document.createElement("div");
+        const valueElement = document.createElement("div");
+        const slider = document.createElement("input");
+
+        card.className = "control-card";
+        glyph.className = "summary-icon";
+        glyph.textContent = icon;
+        copy.className = "control-copy";
+        titleElement.className = "control-title";
+        titleElement.textContent = title;
+        valueElement.className = "control-value";
+        valueElement.textContent = value;
+        copy.append(titleElement, valueElement);
+
+        slider.className = "control-slider";
+        slider.type = "range";
+        slider.min = String(min);
+        slider.max = String(max);
+        slider.value = String(currentValue);
+        slider.disabled = disabled;
+        slider.addEventListener(inputEventName, (event) => {
+          onInput?.(Number(event.currentTarget.value));
+        });
+
+        card.append(glyph, copy, slider);
+
+        if (trailingButton) {
+          card.appendChild(trailingButton);
+        }
+
+        return card;
+      }
+
+      function createActionTile({
+        icon,
+        label,
+        meta,
+        isActive = false,
+        isLoading = false,
+        onClick,
+      }) {
+        const button = document.createElement("button");
+        const iconElement = document.createElement("div");
+        const labelElement = document.createElement("div");
+        const metaElement = document.createElement("div");
+
+        button.className = "action-tile";
+        if (isActive) {
+          button.classList.add("action-tile--active");
+        }
+        if (isLoading) {
+          button.classList.add("action-tile--loading");
+        }
+        button.type = "button";
+        button.addEventListener("click", onClick);
+        iconElement.className = "action-icon";
+        iconElement.textContent = icon;
+        labelElement.className = "action-label";
+        labelElement.textContent = label;
+        metaElement.className = "action-meta";
+        metaElement.textContent = meta;
+        button.append(iconElement, labelElement, metaElement);
+
+        return button;
+      }
+
+      function createListButton({ icon, title, subtitle, tag, onClick }) {
+        const button = document.createElement("button");
+        const main = document.createElement("div");
+        const glyph = document.createElement("div");
+        const meta = document.createElement("div");
+        const titleElement = document.createElement("div");
+        const subtitleElement = document.createElement("div");
+        const tagElement = document.createElement("div");
+
+        button.className = "list-button";
+        button.type = "button";
+        button.addEventListener("click", onClick);
+        main.className = "list-main";
+        glyph.className = "summary-icon";
+        glyph.textContent = icon;
+        meta.className = "list-meta";
+        titleElement.className = "list-title-text";
+        titleElement.textContent = title;
+        subtitleElement.className = "list-subtitle-text";
+        subtitleElement.textContent = subtitle;
+        meta.append(titleElement, subtitleElement);
+        main.append(glyph, meta);
+        tagElement.className = "list-tag";
+        tagElement.textContent = tag;
+        button.append(main, tagElement);
+
+        return button;
+      }
+
+      function renderMainView() {
+        const fragment = document.createDocumentFragment();
+        const header = document.createElement("div");
+        const headerCopy = document.createElement("div");
+        const headerActions = document.createElement("div");
+        const title = document.createElement("div");
+        const closeButton = createIconButton("󰅖", "Close", () => {
+          widget.close();
+        });
+        const body = document.createElement("div");
+        const summaries = document.createElement("div");
+        const controls = document.createElement("div");
+        const actions = document.createElement("div");
+        const networkSummary = getNetworkSummary(state.output.network);
+        const audioSummary = getAudioSummary(state.output.audio);
+        const batterySummary = getBatterySummary(state.output.battery);
+
+        header.className = "panel-header";
+        headerCopy.className = "header-copy";
+        headerActions.className = "header-actions";
+        title.className = "header-title";
+        title.textContent = "Quick Settings";
+        headerCopy.appendChild(title);
+        headerActions.appendChild(closeButton);
+        header.append(headerCopy, headerActions);
+        fragment.appendChild(header);
+
+        body.className = "panel-body";
+        summaries.className = "summary-grid";
+        summaries.appendChild(createSummaryCard(networkSummary));
+        summaries.appendChild(
+          createSummaryCard(
+            audioSummary ?? {
+              icon: "󰖁",
+              label: "Audio",
+              value: "No Device",
+            },
+          ),
+        );
+        if (batterySummary) {
+          summaries.appendChild(createSummaryCard(batterySummary));
+        }
+        body.appendChild(summaries);
+
+        controls.className = "controls";
+        if (audioSummary) {
+          const muteButton = document.createElement("button");
+          muteButton.className = "ghost-button";
+          muteButton.type = "button";
+          muteButton.textContent = audioSummary.isMuted ? "Unmute" : "Mute";
+          muteButton.addEventListener("click", () => {
+            void toggleMute();
+          });
+          controls.appendChild(
+            createControlCard({
+              icon: audioSummary.icon,
+              title: "Volume",
+              value: `${audioSummary.volume}%`,
+              currentValue: audioSummary.volume,
+              onInput: (value) => {
+                void setVolume(value);
+              },
+              trailingButton: muteButton,
+            }),
+          );
+        }
+
+        if (state.brightness.isLoading) {
+          controls.appendChild(
+            createControlCard({
+              icon: "󰃟",
+              title: "Brightness",
+              value: "Loading",
+              currentValue: state.brightness.value,
+              onInput: null,
+              inputEventName: "change",
+              disabled: true,
+            }),
+          );
+        } else if (state.brightness.supported) {
+          const displayButton = document.createElement("button");
+          displayButton.className = "ghost-button";
+          displayButton.type = "button";
+          displayButton.textContent = "Display";
+          displayButton.addEventListener("click", () => {
+            void openSettings(SETTINGS_DEEP_LINKS.display);
+          });
+          controls.appendChild(
+            createControlCard({
+              icon: "󰃠",
+              title: "Brightness",
+              value: `${state.brightness.value}%`,
+              currentValue: state.brightness.value,
+              onInput: (value) => {
+                void setBrightness(value);
+              },
+              inputEventName: "change",
+              trailingButton: displayButton,
+            }),
+          );
+        }
+        body.appendChild(controls);
+
+        actions.className = "actions-grid";
+        getMainActionTiles(state).forEach((item) => {
+          actions.appendChild(
+            createActionTile({
+              ...item,
+              onClick: () => {
+                void handleTileAction(item.action);
+              },
+            }),
+          );
+        });
+        body.appendChild(actions);
+        fragment.appendChild(body);
+
+        return fragment;
+      }
+
+      function renderListView({
+        title,
+        subtitle,
+        onRefresh,
+        onBack,
+        onOpenSettings = null,
+        items,
+        emptyText,
+      }) {
+        const fragment = document.createDocumentFragment();
+        const container = document.createElement("div");
+        const header = document.createElement("div");
+        const headerCopy = document.createElement("div");
+        const headerActions = document.createElement("div");
+        const titleElement = document.createElement("div");
+        const subtitleElement = document.createElement("div");
+        const body = document.createElement("div");
+        const list = document.createElement("div");
+
+        container.className = "list-view";
+        header.className = "list-header";
+        headerCopy.className = "list-copy";
+        headerActions.className = "header-actions";
+        titleElement.className = "list-title";
+        titleElement.textContent = title;
+        subtitleElement.className = "list-subtitle";
+        subtitleElement.textContent = subtitle;
+        headerCopy.append(titleElement, subtitleElement);
+        headerActions.appendChild(createIconButton("󰅁", "Back", onBack));
+        if (onOpenSettings) {
+          headerActions.appendChild(
+            createIconButton("󰒓", "Settings", onOpenSettings),
+          );
+        }
+        headerActions.appendChild(createIconButton("󰑐", "Refresh", onRefresh));
+        header.append(headerCopy, headerActions);
+
+        body.className = "panel-body";
+        list.className = "list-stack";
+        if (!items.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = emptyText;
+          list.appendChild(empty);
+        } else {
+          items.forEach((item) => {
+            list.appendChild(item);
+          });
+        }
+        body.appendChild(list);
+
+        container.append(header, body);
+        fragment.appendChild(container);
+        return fragment;
+      }
+
+      function renderWifiView() {
+        const currentSsid = normalizeText(state.output.network?.defaultGateway?.ssid);
+
+        return renderListView({
+          title: "Wi-Fi",
+          subtitle: currentSsid || "Select a network",
+          onRefresh: () => {
+            void refreshWifiNetworks(true);
+          },
+          onBack: () => {
+            setView("main");
+          },
+          onOpenSettings: () => {
+            void openSettings(SETTINGS_DEEP_LINKS.wifiSettings);
+          },
+          emptyText: state.wifi.isLoading
+            ? "Scanning Wi-Fi networks..."
+            : "No visible networks.",
+          items: state.wifi.items.map((item) =>
+            createListButton({
+              icon: getWifiSignalIcon(item.signalStrength),
+              title: item.ssid,
+              subtitle: item.isConnected ? "Connected" : "Connect",
+              tag: item.isConnected ? "Connected" : "Connect",
+              onClick: () => {
+                void connectWifi(item.ssid);
+              },
+            }),
+          ),
+        });
+      }
+
+      function renderCellularView() {
+        const activeInterface =
+          state.cellular.interfaces.find(
+            (item) =>
+              normalizeText(item.name) ===
+              normalizeText(state.cellular.activeInterfaceName),
+          ) ?? state.cellular.interfaces[0];
+        const items = [];
+
+        if (state.cellular.isConnected && activeInterface?.name) {
+          items.push(
+            createListButton({
+              icon: getCellularSignalIcon(activeInterface.signalStrength),
+              title: activeInterface.name,
+              subtitle: normalizeText(activeInterface.state) || "Connected",
+              tag: "Disconnect",
+              onClick: () => {
+                void disconnectCellular(activeInterface.name);
+              },
+            }),
+          );
+        }
+
+        state.cellular.profiles.forEach((profile) => {
+          const connected = profile.isConnected && state.cellular.isConnected;
+
+          items.push(
+            createListButton({
+              icon: getCellularSignalIcon(activeInterface?.signalStrength),
+              title: profile.name,
+              subtitle:
+                normalizeText(profile.interfaceName) || "Saved cellular profile",
+              tag: connected ? "Disconnect" : "Connect",
+              onClick: () => {
+                if (connected) {
+                  void disconnectCellular(profile.interfaceName);
+                  return;
+                }
+
+                void connectCellular(profile);
+              },
+            }),
+          );
+        });
+
+        return renderListView({
+          title: "Cellular",
+          subtitle:
+            normalizeText(activeInterface?.name) || "Select a cellular profile",
+          onRefresh: () => {
+            void refreshCellularState(true);
+          },
+          onBack: () => {
+            setView("main");
+          },
+          onOpenSettings: () => {
+            void openSettings(SETTINGS_DEEP_LINKS.cellularSettings);
+          },
+          emptyText: state.cellular.isLoading
+            ? "Loading cellular interfaces..."
+            : "No saved cellular profiles.",
+          items,
+        });
+      }
+
+      function renderVpnView() {
+        return renderListView({
+          title: "VPN",
+          subtitle: "Saved VPN connections",
+          onRefresh: () => {
+            void refreshVpnConnections(true);
+          },
+          onBack: () => {
+            setView("main");
+          },
+          onOpenSettings: () => {
+            void openSettings(SETTINGS_DEEP_LINKS.vpnSettings);
+          },
+          emptyText: state.vpn.isLoading
+            ? "Loading VPN connections..."
+            : "No VPN profiles found.",
+          items: state.vpn.items.map((item) =>
+            createListButton({
+              icon: item.isConnected ? "󰯄" : "󰌆",
+              title: item.name,
+              subtitle: item.isConnected ? "Connected" : "Disconnected",
+              tag: item.isConnected ? "Disconnect" : "Connect",
+              onClick: () => {
+                void toggleVpnConnection(item);
+              },
+            }),
+          ),
+        });
+      }
+
+      function renderAccessibilityView() {
+        return renderListView({
+          title: "Accessibility",
+          subtitle: "Windows accessibility shortcuts",
+          onRefresh: () => {},
+          onBack: () => {
+            setView("main");
+          },
+          onOpenSettings: () => {
+            void openSettings(SETTINGS_DEEP_LINKS.accessibility);
+          },
+          emptyText: "No accessibility links configured.",
+          items: ACCESSIBILITY_LINKS.map((item) =>
+            createListButton({
+              icon: item.icon,
+              title: item.label,
+              subtitle: item.uri,
+              tag: "Open",
+              onClick: () => {
+                void openSettings(item.uri);
+              },
+            }),
+          ),
+        });
+      }
+
+      function getPanelBody(root = panel) {
+        return root?.querySelector?.(".panel-body") ?? null;
+      }
+
+      function getPanelScrollTop(root = panel) {
+        const body = getPanelBody(root);
+        return body ? body.scrollTop : 0;
+      }
+
+      function restorePanelScrollTop(scrollTop, root = panel) {
+        const body = getPanelBody(root);
+
+        if (body) {
+          body.scrollTop = scrollTop;
+        }
+      }
+
+      function render() {
+        const shouldPreserveScroll = lastRenderedView === state.view;
+        const previousScrollTop = shouldPreserveScroll
+          ? getPanelScrollTop()
+          : 0;
+
+        clearElement(panel);
+
+        switch (state.view) {
+          case "wifi":
+            panel.appendChild(renderWifiView());
+            break;
+          case "cellular":
+            panel.appendChild(renderCellularView());
+            break;
+          case "vpn":
+            panel.appendChild(renderVpnView());
+            break;
+          case "accessibility":
+            panel.appendChild(renderAccessibilityView());
+            break;
+          default:
+            panel.appendChild(renderMainView());
+            break;
+        }
+
+        if (shouldPreserveScroll) {
+          restorePanelScrollTop(previousScrollTop);
+        }
+
+        lastRenderedView = state.view;
+      }
+
+      const TEST_HOOKS = {
+        panel,
+        state,
+        render,
+        getSignalLevel,
+        getWifiSignalIcon,
+        getCellularSignalIcon,
+        parseWifiNetworks,
+        parseCellularInterfaces,
+        parseCellularProfiles,
+        getMainActionTiles,
+        getPanelScrollTop,
+        restorePanelScrollTop,
+      };
+
+      if (globalThis.__WINTENDER_TEST_MODE__) {
+        globalThis.__WINTENDER_QUICK_SETTINGS_TEST_HOOKS__ = TEST_HOOKS;
+      } else {
+        providers.onOutput((output) => {
+          if (output.battery) {
+            state.output.battery = output.battery;
+          }
+          if (output.network) {
+            state.output.network = output.network;
+          }
+          if (output.audio) {
+            state.output.audio = output.audio;
+          }
+          render();
+        });
+
+        providers.onError((error) => {
+          console.error("Quick Settings provider error", error);
+        });
+
+        widget.tauriWindow.listen("tauri://blur", () => {
+          widget.close();
+        });
+
+        if (typeof window?.addEventListener === "function") {
+          window.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+              widget.close();
+            }
+          });
+        }
+
+        render();
+        void refreshBrightness();
+        void refreshCellularState(true);
+        void refreshVpnConnections(true);
+        void refreshStudioEffectsSupport();
+        void refreshToggleStates();
+
+        supplementalRefreshTimer = setInterval(() => {
+          void refreshToggleStates();
+          void refreshBrightness();
+          void refreshStudioEffectsSupport();
+          if (state.view === "wifi") {
+            void refreshWifiNetworks();
+          }
+          if (state.view === "cellular" || state.view === "main") {
+            void refreshCellularState();
+          }
+          if (state.view === "vpn" || state.view === "main") {
+            void refreshVpnConnections();
+          }
+        }, SUPPLEMENTAL_REFRESH_INTERVAL);
+
+        if (typeof window?.addEventListener === "function") {
+          window.addEventListener("beforeunload", () => {
+            if (supplementalRefreshTimer) {
+              clearInterval(supplementalRefreshTimer);
+            }
+          });
+        }
+      }
+    </script>
+  </body>
+</html>

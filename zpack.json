@@ -96,6 +96,55 @@
       "providers": [
         "systray"
       ]
+    },
+    {
+      "name": "quick-settings",
+      "htmlPath": "./quick-settings.html",
+      "zOrder": "top_most",
+      "shownInTaskbar": false,
+      "focused": true,
+      "resizable": false,
+      "transparent": true,
+      "includeFiles": ["*.html", "resources/*"],
+      "privileges": {
+        "shellCommands": [
+          {
+            "program": "netsh.exe",
+            "argsRegex": "^(mbn show interfaces|mbn show profiles .+|mbn connect .+|mbn disconnect .+|wlan show networks mode=bssid|wlan connect .+)$"
+          },
+          {
+            "program": "powershell.exe",
+            "argsRegex": "^-NoProfile -NonInteractive -WindowStyle Hidden -Command .+$"
+          },
+          {
+            "program": "rasdial.exe",
+            "argsRegex": "^.+( /disconnect)?$"
+          }
+        ]
+      },
+      "presets": [
+        {
+          "name": "default",
+          "anchor": "top_right",
+          "offsetX": "0px",
+          "offsetY": "40px",
+          "width": "420px",
+          "height": "580px",
+          "monitorSelection": {
+            "type": "primary"
+          },
+          "dockToEdge": {
+            "enabled": false,
+            "edge": null,
+            "windowMargin": "0px"
+          }
+        }
+      ],
+      "providers": [
+        "battery",
+        "network",
+        "audio"
+      ]
     }
   ]
 }
