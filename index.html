@@ -275,6 +275,16 @@
         </div>
         <script type="module">
             import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
+            import {
+                buildTrayAppLookupCommand,
+                extractLegacyPinnedTrayTooltips,
+                getTrayAppLookupIds,
+                migrateLegacyPinnedTrayTooltips,
+                parseTrayAppLookupResponse,
+                resolveTrayAppIdentity,
+                sanitizePinnedTrayApps,
+                upgradePinnedTrayApps,
+            } from "./resources/tray-app-identity.mjs";
 
             const MEDIA_TEXT_LIMIT = 28;
             const VOLUME_STEP = 5;
@@ -310,7 +320,7 @@
                 showAudio: true,
                 showBattery: true,
                 clockFormat: "",
-                pinnedTrayTooltips: [],
+                pinnedTrayApps: [],
             });
             const CLOCK_TOKEN_PATTERN =
                 /yyyy|dddd|ddd|yy|MM|M|dd|d|HH|H|hh|h|mm|m|ss|s|tt/g;
@@ -358,6 +368,9 @@
                 userSettings: { ...DEFAULT_USER_SETTINGS },
                 userSettingsStorageRaw: null,
                 userSettingsChannel: null,
+                pendingLegacyPinnedTrayTooltips: [],
+                trayAppProcessInfoByIconId: new Map(),
+                trayAppLookupRequest: null,
             };
 
             function clamp(value, min, max) {
@@ -485,10 +498,10 @@
                     settings.clockFormat = normalizeText(rawSettings.clockFormat);
                 }
 
-                if (Array.isArray(rawSettings.pinnedTrayTooltips)) {
-                    settings.pinnedTrayTooltips = rawSettings.pinnedTrayTooltips
-                        .map((value) => normalizeText(value))
-                        .filter(Boolean);
+                if (Array.isArray(rawSettings.pinnedTrayApps)) {
+                    settings.pinnedTrayApps = sanitizePinnedTrayApps(
+                        rawSettings.pinnedTrayApps,
+                    );
                 }
 
                 return settings;
@@ -514,6 +527,7 @@
                     return {
                         raw: null,
                         settings: getDefaultUserSettings(),
+                        legacyPinnedTrayTooltips: [],
                     };
                 }
 
@@ -523,13 +537,31 @@
                     return {
                         raw: null,
                         settings: getDefaultUserSettings(),
+                        legacyPinnedTrayTooltips: [],
                     };
                 }
 
+                const parsedSettings = safeJsonParse(raw);
+
                 return {
                     raw,
-                    settings: mergeUserSettings(safeJsonParse(raw)),
+                    settings: mergeUserSettings(parsedSettings),
+                    legacyPinnedTrayTooltips:
+                        extractLegacyPinnedTrayTooltips(parsedSettings),
                 };
+            }
+
+            function writeStoredUserSettings(
+                settings,
+                storage = globalThis.localStorage,
+            ) {
+                if (typeof storage?.setItem !== "function") {
+                    return null;
+                }
+
+                const raw = JSON.stringify(settings);
+                storage.setItem(WINTENDER_SETTINGS_STORAGE_KEY, raw);
+                return raw;
             }
 
             function padNumber(value, length = 2) {
@@ -642,11 +674,18 @@
                 {
                     raw = null,
                     rerender = true,
+                    legacyPinnedTrayTooltips =
+                        state.pendingLegacyPinnedTrayTooltips,
                 } = {},
             ) {
                 const previousSettings = state.userSettings;
                 state.userSettings = mergeUserSettings(rawSettings);
                 state.userSettingsStorageRaw = raw;
+                state.pendingLegacyPinnedTrayTooltips = Array.isArray(
+                    legacyPinnedTrayTooltips,
+                )
+                    ? [...legacyPinnedTrayTooltips]
+                    : [];
                 syncWeatherProviderForSettings({
                     previousSettings,
                     nextSettings: state.userSettings,
@@ -654,6 +693,10 @@
 
                 if (rerender) {
                     renderAllCurrentState();
+                }
+
+                if (state.latestSystrayOutput) {
+                    void refreshTrayAppProcessInfo(state.latestSystrayOutput);
                 }
 
                 return state.userSettings;
@@ -667,21 +710,51 @@
                 storage = globalThis.localStorage,
                 rerender = true,
             } = {}) {
-                const { raw, settings } = readStoredUserSettings(storage);
+                const { raw, settings, legacyPinnedTrayTooltips } =
+                    readStoredUserSettings(storage);
 
                 if (raw === state.userSettingsStorageRaw) {
                     return state.userSettings;
                 }
 
-                return applyUserSettings(settings, { raw, rerender });
+                const nextSettings = applyUserSettings(settings, {
+                    raw,
+                    rerender,
+                    legacyPinnedTrayTooltips,
+                });
+
+                const sanitizedRaw = JSON.stringify(nextSettings);
+
+                if (
+                    legacyPinnedTrayTooltips.length ||
+                    (typeof raw === "string" && raw !== sanitizedRaw)
+                ) {
+                    state.userSettingsStorageRaw = writeStoredUserSettings(
+                        nextSettings,
+                        storage,
+                    );
+                }
+
+                return nextSettings;
             }
 
             function initializeUserSettings() {
-                const { raw, settings } = readStoredUserSettings();
-                applyUserSettings(settings, {
+                const { raw, settings, legacyPinnedTrayTooltips } =
+                    readStoredUserSettings();
+                const nextSettings = applyUserSettings(settings, {
                     raw,
                     rerender: false,
+                    legacyPinnedTrayTooltips,
                 });
+                const sanitizedRaw = JSON.stringify(nextSettings);
+
+                if (
+                    legacyPinnedTrayTooltips.length ||
+                    (typeof raw === "string" && raw !== sanitizedRaw)
+                ) {
+                    state.userSettingsStorageRaw =
+                        writeStoredUserSettings(nextSettings);
+                }
             }
 
             function setupUserSettingsSync() {
@@ -1490,11 +1563,166 @@
                 };
             }
 
+            function getResolvedTrayAppProcessInfo(icon) {
+                const iconId = normalizeText(icon?.id);
+
+                if (!iconId) {
+                    return null;
+                }
+
+                return state.trayAppProcessInfoByIconId.get(iconId) ?? null;
+            }
+
+            function getTrayAppIdentity(icon) {
+                return resolveTrayAppIdentity(
+                    icon,
+                    getResolvedTrayAppProcessInfo(icon),
+                );
+            }
+
+            function getTrayAppFallbackIdentity(icon) {
+                return resolveTrayAppIdentity(icon, null);
+            }
+
+            function persistSanitizedUserSettings(
+                storage = globalThis.localStorage,
+            ) {
+                const raw = writeStoredUserSettings(state.userSettings, storage);
+
+                if (typeof raw === "string") {
+                    state.userSettingsStorageRaw = raw;
+                }
+
+                return raw;
+            }
+
+            function maybeMigrateLegacyPinnedTraySettings(
+                systrayOutput = state.latestSystrayOutput,
+                storage = globalThis.localStorage,
+            ) {
+                if (!state.pendingLegacyPinnedTrayTooltips.length) {
+                    return false;
+                }
+
+                const migratedPinnedTrayApps = migrateLegacyPinnedTrayTooltips(
+                    state.pendingLegacyPinnedTrayTooltips,
+                    systrayOutput?.icons ?? [],
+                    state.trayAppProcessInfoByIconId,
+                );
+
+                if (!migratedPinnedTrayApps.length) {
+                    return false;
+                }
+
+                state.userSettings = mergeUserSettings({
+                    ...state.userSettings,
+                    pinnedTrayApps: [
+                        ...state.userSettings.pinnedTrayApps,
+                        ...migratedPinnedTrayApps,
+                    ],
+                });
+                state.pendingLegacyPinnedTrayTooltips = [];
+                persistSanitizedUserSettings(storage);
+                return true;
+            }
+
+            function maybeUpgradePinnedTrayAppSettings(
+                systrayOutput = state.latestSystrayOutput,
+                storage = globalThis.localStorage,
+            ) {
+                const upgradedPinnedTrayApps = upgradePinnedTrayApps(
+                    state.userSettings.pinnedTrayApps,
+                    systrayOutput?.icons ?? [],
+                    state.trayAppProcessInfoByIconId,
+                );
+
+                if (
+                    JSON.stringify(upgradedPinnedTrayApps) ===
+                    JSON.stringify(state.userSettings.pinnedTrayApps)
+                ) {
+                    return false;
+                }
+
+                state.userSettings = mergeUserSettings({
+                    ...state.userSettings,
+                    pinnedTrayApps: upgradedPinnedTrayApps,
+                });
+                persistSanitizedUserSettings(storage);
+                return true;
+            }
+
+            async function refreshTrayAppProcessInfo(
+                systrayOutput = state.latestSystrayOutput,
+            ) {
+                const lookupIconIds = getTrayAppLookupIds(
+                    systrayOutput?.icons ?? [],
+                    state.trayAppProcessInfoByIconId,
+                );
+
+                if (!lookupIconIds.length || state.trayAppLookupRequest) {
+                    return state.trayAppLookupRequest;
+                }
+
+                const command = buildTrayAppLookupCommand(lookupIconIds);
+
+                if (!command) {
+                    return null;
+                }
+
+                state.trayAppLookupRequest = (async () => {
+                    try {
+                        const result = await zebar.shellExec(
+                            "powershell.exe",
+                            `-NoProfile -NonInteractive -WindowStyle Hidden -Command ${command}`,
+                        );
+                        const resolvedProcessInfoByIconId =
+                            parseTrayAppLookupResponse(result.stdout);
+
+                        lookupIconIds.forEach((iconId) => {
+                            const resolvedProcessInfo =
+                                resolvedProcessInfoByIconId.get(iconId) ?? null;
+
+                            if (resolvedProcessInfo) {
+                                state.trayAppProcessInfoByIconId.set(
+                                    iconId,
+                                    resolvedProcessInfo,
+                                );
+                            } else {
+                                state.trayAppProcessInfoByIconId.delete(iconId);
+                            }
+                        });
+
+                        const migrated = maybeMigrateLegacyPinnedTraySettings();
+                        const upgraded = maybeUpgradePinnedTrayAppSettings();
+
+                        if (migrated || upgraded) {
+                            renderAllCurrentState();
+                        } else {
+                            renderSystray(state.latestSystrayOutput);
+                        }
+                    } catch (error) {
+                        lookupIconIds.forEach((iconId) => {
+                            state.trayAppProcessInfoByIconId.delete(iconId);
+                        });
+                        console.error("Failed to resolve tray app identities", error);
+                    } finally {
+                        state.trayAppLookupRequest = null;
+                    }
+                })();
+
+                return state.trayAppLookupRequest;
+            }
+
             function isPinnedTrayIcon(icon) {
-                const tooltip = normalizeText(icon?.tooltip);
-                return tooltip
-                    ? state.userSettings.pinnedTrayTooltips.includes(tooltip)
-                    : false;
+                const identity = getTrayAppIdentity(icon);
+                const fallbackIdentity = getTrayAppFallbackIdentity(icon);
+                return [identity, fallbackIdentity].some(
+                    (candidateIdentity) =>
+                        candidateIdentity &&
+                        state.userSettings.pinnedTrayApps.includes(
+                            candidateIdentity,
+                        ),
+                );
             }
 
             function getTrayGroups(systrayOutput) {
@@ -2432,7 +2660,9 @@
                     state.latestAudioOutput = output.audio;
                     state.latestBatteryOutput = output.battery;
                     syncUserSettingsFromStorage({ rerender: false });
+                    maybeMigrateLegacyPinnedTraySettings(output.systray);
                     renderAllCurrentState();
+                    void refreshTrayAppProcessInfo(output.systray);
                     refreshCellularSignalStrength(output.network);
                     void syncKomorebiState();
                 });

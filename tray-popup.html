@@ -86,11 +86,18 @@
 
     <script type="module">
       import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
+      import {
+        buildTrayAppLookupCommand,
+        getTrayAppLookupIds,
+        parseTrayAppLookupResponse,
+        resolveTrayAppIdentity,
+        sanitizePinnedTrayApps,
+      } from "./resources/tray-app-identity.mjs";
 
       const CONTEXT_MENU_BLUR_GRACE_MS = 400;
       const WINTENDER_SETTINGS_STORAGE_KEY = "wintender:settings";
       const DEFAULT_USER_SETTINGS = Object.freeze({
-        pinnedTrayTooltips: [],
+        pinnedTrayApps: [],
       });
 
       const popup = document.getElementById("popup");
@@ -101,6 +108,10 @@
       const state = {
         suppressBlurCloseUntil: 0,
         userSettings: { ...DEFAULT_USER_SETTINGS },
+        userSettingsStorageRaw: null,
+        trayAppProcessInfoByIconId: new Map(),
+        trayAppLookupRequest: null,
+        latestSystrayOutput: null,
       };
 
       function clearElement(element) {
@@ -118,10 +129,10 @@
           ...DEFAULT_USER_SETTINGS,
         };
 
-        if (Array.isArray(rawSettings?.pinnedTrayTooltips)) {
-          settings.pinnedTrayTooltips = rawSettings.pinnedTrayTooltips
-            .map((value) => normalizeText(value))
-            .filter(Boolean);
+        if (Array.isArray(rawSettings?.pinnedTrayApps)) {
+          settings.pinnedTrayApps = sanitizePinnedTrayApps(
+            rawSettings.pinnedTrayApps,
+          );
         }
 
         return settings;
@@ -145,12 +156,20 @@
       ) {
         if (typeof storage?.getItem !== "function") {
           state.userSettings = mergeUserSettings(null);
+          state.userSettingsStorageRaw = null;
           return state.userSettings;
         }
 
-        state.userSettings = mergeUserSettings(
-          safeJsonParse(storage.getItem(WINTENDER_SETTINGS_STORAGE_KEY)),
-        );
+        const raw = storage.getItem(WINTENDER_SETTINGS_STORAGE_KEY);
+
+        if (raw === state.userSettingsStorageRaw) {
+          return state.userSettings;
+        }
+
+        const parsedSettings = safeJsonParse(raw);
+        state.userSettings = mergeUserSettings(parsedSettings);
+        state.userSettingsStorageRaw = raw;
+
         return state.userSettings;
       }
 
@@ -159,11 +178,87 @@
         return state.userSettings;
       }
 
+      function getResolvedTrayAppProcessInfo(icon) {
+        const iconId = normalizeText(icon?.id);
+
+        if (!iconId) {
+          return null;
+        }
+
+        return state.trayAppProcessInfoByIconId.get(iconId) ?? null;
+      }
+
+      function getTrayAppIdentity(icon) {
+        return resolveTrayAppIdentity(icon, getResolvedTrayAppProcessInfo(icon));
+      }
+
+      function getTrayAppFallbackIdentity(icon) {
+        return resolveTrayAppIdentity(icon, null);
+      }
+
+      async function refreshTrayAppProcessInfo(
+        systrayOutput = state.latestSystrayOutput,
+      ) {
+        const lookupIconIds = getTrayAppLookupIds(
+          systrayOutput?.icons ?? [],
+          state.trayAppProcessInfoByIconId,
+        );
+
+        if (!lookupIconIds.length || state.trayAppLookupRequest) {
+          return state.trayAppLookupRequest;
+        }
+
+        const command = buildTrayAppLookupCommand(lookupIconIds);
+
+        if (!command) {
+          return null;
+        }
+
+        state.trayAppLookupRequest = (async () => {
+          try {
+            const result = await zebar.shellExec(
+              "powershell.exe",
+              `-NoProfile -NonInteractive -WindowStyle Hidden -Command ${command}`,
+            );
+            const resolvedProcessInfoByIconId =
+              parseTrayAppLookupResponse(result.stdout);
+
+            lookupIconIds.forEach((iconId) => {
+              const resolvedProcessInfo =
+                resolvedProcessInfoByIconId.get(iconId) ?? null;
+
+              if (resolvedProcessInfo) {
+                state.trayAppProcessInfoByIconId.set(
+                  iconId,
+                  resolvedProcessInfo,
+                );
+              } else {
+                state.trayAppProcessInfoByIconId.delete(iconId);
+              }
+            });
+
+            renderPopup(state.latestSystrayOutput);
+          } catch (error) {
+            lookupIconIds.forEach((iconId) => {
+              state.trayAppProcessInfoByIconId.delete(iconId);
+            });
+            console.error("Failed to resolve tray app identities", error);
+          } finally {
+            state.trayAppLookupRequest = null;
+          }
+        })();
+
+        return state.trayAppLookupRequest;
+      }
+
       function isPinnedTrayIcon(icon) {
-        const tooltip = normalizeText(icon?.tooltip);
-        return tooltip
-          ? state.userSettings.pinnedTrayTooltips.includes(tooltip)
-          : false;
+        const identity = getTrayAppIdentity(icon);
+        const fallbackIdentity = getTrayAppFallbackIdentity(icon);
+        return [identity, fallbackIdentity].some(
+          (candidateIdentity) =>
+            candidateIdentity &&
+            state.userSettings.pinnedTrayApps.includes(candidateIdentity),
+        );
       }
 
       function getVisibleOverflowIcons(systrayOutput) {
@@ -186,6 +281,23 @@
 
       async function closePopup() {
         await widget.close();
+      }
+
+      function renderPopup(systrayOutput = state.latestSystrayOutput) {
+        const icons = getVisibleOverflowIcons(systrayOutput);
+
+        clearElement(popup);
+
+        if (!icons.length) {
+          void closePopup();
+          return;
+        }
+
+        icons.forEach((icon) => {
+          popup.appendChild(buildTrayButton(icon, systrayOutput));
+        });
+
+        popup.classList.remove("hidden");
       }
 
       function buildTrayButton(icon, systrayOutput) {
@@ -253,21 +365,10 @@
       }
 
       providers.onOutput((output) => {
+        state.latestSystrayOutput = output.systray;
         syncUserSettingsFromStorage();
-        const icons = getVisibleOverflowIcons(output.systray);
-
-        clearElement(popup);
-
-        if (!icons.length) {
-          closePopup();
-          return;
-        }
-
-        icons.forEach((icon) => {
-          popup.appendChild(buildTrayButton(icon, output.systray));
-        });
-
-        popup.classList.remove("hidden");
+        renderPopup(output.systray);
+        void refreshTrayAppProcessInfo(output.systray);
       });
 
       providers.onError((error) => {

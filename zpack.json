@@ -40,6 +40,10 @@
                         "argsRegex": "^$"
                     },
                     {
+                        "program": "powershell.exe",
+                        "argsRegex": "^-NoProfile -NonInteractive -WindowStyle Hidden -Command .+$"
+                    },
+                    {
                         "program": "C:\\Program Files\\komorebi\\bin\\komorebic-no-console.exe",
                         "argsRegex": "^(state|focus-monitor-workspace \\d+ \\d+)$"
                     },
@@ -97,7 +101,12 @@
                 "rules": []
             },
             "privileges": {
-                "shellCommands": []
+                "shellCommands": [
+                    {
+                        "program": "powershell.exe",
+                        "argsRegex": "^-NoProfile -NonInteractive -WindowStyle Hidden -Command .+$"
+                    }
+                ]
             },
             "presets": [
                 {
@@ -182,7 +191,12 @@
                 "rules": []
             },
             "privileges": {
-                "shellCommands": []
+                "shellCommands": [
+                    {
+                        "program": "powershell.exe",
+                        "argsRegex": "^-NoProfile -NonInteractive -WindowStyle Hidden -Command .+$"
+                    }
+                ]
             },
             "presets": [
                 {
@@ -202,7 +216,7 @@
                     }
                 }
             ],
-            "providers": []
+            "providers": ["systray"]
         }
     ]
 }
