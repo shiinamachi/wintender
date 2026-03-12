@@ -264,28 +264,42 @@
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px;
+                width: 100%;
+                min-width: 0;
             }
 
             .chip-button,
             .chip-static {
                 display: inline-flex;
-                align-items: center;
+                align-items: flex-start;
                 gap: 6px;
                 min-height: 30px;
-                padding: 0 10px;
+                max-width: 100%;
+                min-width: 0;
+                padding: 6px 10px;
                 border: 1px solid var(--panel-border);
                 border-radius: 999px;
                 background: var(--panel-preview);
                 color: var(--panel-text);
                 font: inherit;
+                line-height: 1.4;
             }
 
             .chip-button {
+                text-align: left;
                 cursor: pointer;
                 transition:
                     background 0.18s ease,
                     border-color 0.18s ease,
                     color 0.18s ease;
+            }
+
+            .chip-text {
+                flex: 1 1 auto;
+                min-width: 0;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
             }
 
             .chip-button:hover {
@@ -299,15 +313,21 @@
             }
 
             .chip-remove {
+                flex: 0 0 auto;
+                align-self: flex-start;
                 border: 0;
+                padding: 2px;
+                border-radius: 6px;
                 background: transparent;
                 color: inherit;
                 font: inherit;
+                line-height: 1;
                 cursor: pointer;
                 opacity: 0.72;
             }
 
             .chip-remove:hover {
+                background: var(--panel-hover);
                 opacity: 1;
             }
 
@@ -492,7 +512,8 @@
                     <h2 class="section-label">Pinned Tray Icons</h2>
                     <span class="field-hint">
                         Pin tray icons to the top bar by selecting a detected
-                        tooltip or adding an exact-match tooltip manually.
+                        app identity or adding an exact-match process name or
+                        executable path manually.
                     </span>
 
                     <div class="preview">
@@ -506,7 +527,7 @@
                             <input
                                 id="tray-pin-input"
                                 type="text"
-                                placeholder="Windows Security"
+                                placeholder="SecurityHealthSystray.exe"
                                 spellcheck="false"
                             />
                             <button
@@ -529,6 +550,18 @@
 
         <script type="module">
             import * as zebar from "https://esm.sh/zebar@3.1.1?bundle";
+            import {
+                buildTrayAppLookupCommand,
+                extractLegacyPinnedTrayTooltips,
+                formatTrayAppIdentity,
+                getDetectedTrayApps,
+                getTrayAppLookupIds,
+                migrateLegacyPinnedTrayTooltips,
+                normalizeTrayAppIdentity,
+                parseTrayAppLookupResponse,
+                sanitizePinnedTrayApps,
+                upgradePinnedTrayApps,
+            } from "./resources/tray-app-identity.mjs";
 
             const WINTENDER_SETTINGS_STORAGE_KEY = "wintender:settings";
             const WINTENDER_SETTINGS_CHANNEL_NAME = "wintender-settings";
@@ -540,7 +573,7 @@
                 showAudio: true,
                 showBattery: true,
                 clockFormat: "",
-                pinnedTrayTooltips: [],
+                pinnedTrayApps: [],
             });
             const CLOCK_TOKEN_PATTERN =
                 /yyyy|dddd|ddd|yy|MM|M|dd|d|HH|H|hh|h|mm|m|ss|s|tt/g;
@@ -575,7 +608,13 @@
                 userSettings: { ...DEFAULT_USER_SETTINGS },
                 previewTimer: null,
                 channel: null,
-                detectedTrayTooltips: [],
+                userSettingsStorageRaw: null,
+                hasLoadedUserSettings: false,
+                detectedTrayApps: [],
+                pendingLegacyPinnedTrayTooltips: [],
+                trayAppProcessInfoByIconId: new Map(),
+                trayAppLookupRequest: null,
+                latestSystrayOutput: null,
             };
 
             function normalizeText(text) {
@@ -665,12 +704,10 @@
                     settings.clockFormat = normalizeText(rawSettings.clockFormat);
                 }
 
-                if (Array.isArray(rawSettings.pinnedTrayTooltips)) {
-                    settings.pinnedTrayTooltips = [...new Set(
-                        rawSettings.pinnedTrayTooltips
-                            .map((value) => normalizeText(value))
-                            .filter(Boolean),
-                    )];
+                if (Array.isArray(rawSettings.pinnedTrayApps)) {
+                    settings.pinnedTrayApps = sanitizePinnedTrayApps(
+                        rawSettings.pinnedTrayApps,
+                    );
                 }
 
                 return settings;
@@ -697,12 +734,31 @@
 
             function readStoredUserSettings(storage = globalThis.localStorage) {
                 if (typeof storage?.getItem !== "function") {
-                    return getDefaultUserSettings();
+                    return {
+                        raw: null,
+                        settings: getDefaultUserSettings(),
+                        legacyPinnedTrayTooltips: [],
+                    };
                 }
 
-                return mergeUserSettings(
-                    safeJsonParse(storage.getItem(WINTENDER_SETTINGS_STORAGE_KEY)),
-                );
+                const raw = storage.getItem(WINTENDER_SETTINGS_STORAGE_KEY);
+
+                if (typeof raw !== "string" || !raw.trim()) {
+                    return {
+                        raw: null,
+                        settings: getDefaultUserSettings(),
+                        legacyPinnedTrayTooltips: [],
+                    };
+                }
+
+                const parsedSettings = safeJsonParse(raw);
+
+                return {
+                    raw,
+                    settings: mergeUserSettings(parsedSettings),
+                    legacyPinnedTrayTooltips:
+                        extractLegacyPinnedTrayTooltips(parsedSettings),
+                };
             }
 
             function writeStoredUserSettings(
@@ -710,13 +766,13 @@
                 storage = globalThis.localStorage,
             ) {
                 if (typeof storage?.setItem !== "function") {
-                    return;
+                    return null;
                 }
 
-                storage.setItem(
-                    WINTENDER_SETTINGS_STORAGE_KEY,
-                    JSON.stringify(settings),
-                );
+                const raw = JSON.stringify(settings);
+
+                storage.setItem(WINTENDER_SETTINGS_STORAGE_KEY, raw);
+                return raw;
             }
 
             function padNumber(value, length = 2) {
@@ -820,29 +876,190 @@
                 elements.clockPreview.textContent = getPreviewText();
             }
 
-            function renderPinnedTrayTooltips() {
+            function persistSanitizedUserSettings(
+                storage = globalThis.localStorage,
+            ) {
+                const raw = writeStoredUserSettings(state.userSettings, storage);
+
+                if (typeof raw === "string") {
+                    state.userSettingsStorageRaw = raw;
+                }
+
+                return raw;
+            }
+
+            function refreshDetectedTrayApps(
+                systrayOutput = state.latestSystrayOutput,
+            ) {
+                state.detectedTrayApps = getDetectedTrayApps(
+                    systrayOutput?.icons ?? [],
+                    state.trayAppProcessInfoByIconId,
+                );
+                return state.detectedTrayApps;
+            }
+
+            function maybeMigrateLegacyPinnedTraySettings(
+                systrayOutput = state.latestSystrayOutput,
+                storage = globalThis.localStorage,
+            ) {
+                if (!state.pendingLegacyPinnedTrayTooltips.length) {
+                    return false;
+                }
+
+                const migratedPinnedTrayApps = migrateLegacyPinnedTrayTooltips(
+                    state.pendingLegacyPinnedTrayTooltips,
+                    systrayOutput?.icons ?? [],
+                    state.trayAppProcessInfoByIconId,
+                );
+
+                if (!migratedPinnedTrayApps.length) {
+                    return false;
+                }
+
+                state.userSettings = mergeUserSettings({
+                    ...state.userSettings,
+                    pinnedTrayApps: [
+                        ...state.userSettings.pinnedTrayApps,
+                        ...migratedPinnedTrayApps,
+                    ],
+                });
+                state.pendingLegacyPinnedTrayTooltips = [];
+                persistSanitizedUserSettings(storage);
+                broadcastUserSettings();
+                return true;
+            }
+
+            async function refreshTrayAppProcessInfo(
+                systrayOutput = state.latestSystrayOutput,
+            ) {
+                const lookupIconIds = getTrayAppLookupIds(
+                    systrayOutput?.icons ?? [],
+                    state.trayAppProcessInfoByIconId,
+                );
+
+                if (!lookupIconIds.length || state.trayAppLookupRequest) {
+                    return state.trayAppLookupRequest;
+                }
+
+                const command = buildTrayAppLookupCommand(lookupIconIds);
+
+                if (!command) {
+                    return null;
+                }
+
+                state.trayAppLookupRequest = (async () => {
+                    try {
+                        const result = await zebar.shellExec(
+                            "powershell.exe",
+                            `-NoProfile -NonInteractive -WindowStyle Hidden -Command ${command}`,
+                        );
+                        const resolvedProcessInfoByIconId =
+                            parseTrayAppLookupResponse(result.stdout);
+
+                        lookupIconIds.forEach((iconId) => {
+                            const resolvedProcessInfo =
+                                resolvedProcessInfoByIconId.get(iconId) ?? null;
+
+                            if (resolvedProcessInfo) {
+                                state.trayAppProcessInfoByIconId.set(
+                                    iconId,
+                                    resolvedProcessInfo,
+                                );
+                            } else {
+                                state.trayAppProcessInfoByIconId.delete(iconId);
+                            }
+                        });
+
+                        refreshDetectedTrayApps();
+
+                        const upgradedPinnedTrayApps = upgradePinnedTrayApps(
+                            state.userSettings.pinnedTrayApps,
+                            systrayOutput?.icons ?? [],
+                            state.trayAppProcessInfoByIconId,
+                        );
+
+                        if (
+                            JSON.stringify(upgradedPinnedTrayApps) !==
+                            JSON.stringify(state.userSettings.pinnedTrayApps)
+                        ) {
+                            state.userSettings = mergeUserSettings({
+                                ...state.userSettings,
+                                pinnedTrayApps: upgradedPinnedTrayApps,
+                            });
+                            persistSanitizedUserSettings();
+                            broadcastUserSettings();
+                        }
+
+                        if (maybeMigrateLegacyPinnedTraySettings()) {
+                            renderForm();
+                        } else {
+                            renderPinnedTrayApps();
+                        }
+                    } catch (error) {
+                        lookupIconIds.forEach((iconId) => {
+                            state.trayAppProcessInfoByIconId.delete(iconId);
+                        });
+                        console.error("Failed to resolve tray app identities", error);
+                    } finally {
+                        state.trayAppLookupRequest = null;
+                    }
+                })();
+
+                return state.trayAppLookupRequest;
+            }
+
+            function renderPinnedTrayApps() {
                 clearElement(elements.trayPinDetectedList);
                 clearElement(elements.trayPinManualList);
 
-                const detected = state.detectedTrayTooltips;
-                const pinned = state.userSettings.pinnedTrayTooltips;
+                const detected = state.detectedTrayApps;
+                const pinned = state.userSettings.pinnedTrayApps;
+
+                function getPinnedTrayAppDisplayLabel(identity, detectedApps) {
+                    const detectedEntry = detectedApps.find(
+                        (entry) =>
+                            entry.identity === identity ||
+                            entry.fallbackIdentity === identity,
+                    );
+
+                    if (detectedEntry?.tooltip) {
+                        return detectedEntry.tooltip;
+                    }
+
+                    return formatTrayAppIdentity(identity);
+                }
 
                 if (!detected.length) {
                     const empty = document.createElement("span");
                     empty.className = "chip-static";
-                    empty.textContent = "No tray tooltips detected yet.";
+                    empty.textContent = "No tray apps detected yet.";
                     elements.trayPinDetectedList.appendChild(empty);
                 } else {
-                    detected.forEach((tooltip) => {
+                    detected.forEach((entry) => {
                         const button = document.createElement("button");
-                        const isActive = pinned.includes(tooltip);
+                        const label = document.createElement("span");
+                        const matchingPinnedIdentity = [
+                            entry.identity,
+                            entry.fallbackIdentity,
+                        ].find((identity) => pinned.includes(identity));
+                        const isActive = Boolean(matchingPinnedIdentity);
                         button.className = isActive
                             ? "chip-button chip-button-active"
                             : "chip-button";
                         button.type = "button";
-                        button.textContent = tooltip;
+                        label.className = "chip-text";
+                        label.textContent = entry.displayLabel;
+                        button.title = entry.tooltip
+                            ? `${entry.tooltip} (${entry.label})`
+                            : entry.label;
+                        button.appendChild(label);
                         button.addEventListener("click", () => {
-                            togglePinnedTrayTooltip(tooltip);
+                            if (matchingPinnedIdentity) {
+                                removePinnedTrayApp(matchingPinnedIdentity);
+                                return;
+                            }
+
+                            addPinnedTrayApp(entry.identity);
                         });
                         elements.trayPinDetectedList.appendChild(button);
                     });
@@ -851,23 +1068,30 @@
                 if (!pinned.length) {
                     const empty = document.createElement("span");
                     empty.className = "chip-static";
-                    empty.textContent = "No pinned tray tooltips configured.";
+                    empty.textContent = "No pinned tray apps configured.";
                     elements.trayPinManualList.appendChild(empty);
                     return;
                 }
 
-                pinned.forEach((tooltip) => {
+                pinned.forEach((identity) => {
                     const chip = document.createElement("span");
+                    const label = document.createElement("span");
                     const remove = document.createElement("button");
 
                     chip.className = "chip-static";
-                    chip.appendChild(document.createTextNode(tooltip));
+                    label.className = "chip-text";
+                    label.textContent = getPinnedTrayAppDisplayLabel(
+                        identity,
+                        detected,
+                    );
+                    chip.title = identity;
+                    chip.appendChild(label);
 
                     remove.className = "chip-remove";
                     remove.type = "button";
                     remove.textContent = "x";
                     remove.addEventListener("click", () => {
-                        removePinnedTrayTooltip(tooltip);
+                        removePinnedTrayApp(identity);
                     });
 
                     chip.appendChild(remove);
@@ -885,7 +1109,7 @@
                 elements.showBattery.checked = state.userSettings.showBattery;
                 elements.clockFormat.value = state.userSettings.clockFormat;
                 renderPreview();
-                renderPinnedTrayTooltips();
+                renderPinnedTrayApps();
             }
 
             function collectFormSettings() {
@@ -898,49 +1122,49 @@
                     showAudio: elements.showAudio.checked,
                     showBattery: elements.showBattery.checked,
                     clockFormat: elements.clockFormat.value,
-                    pinnedTrayTooltips: state.userSettings.pinnedTrayTooltips,
+                    pinnedTrayApps: state.userSettings.pinnedTrayApps,
                 });
             }
 
-            function persistPinnedTrayTooltips(nextTooltips) {
+            function persistPinnedTrayApps(nextPinnedTrayApps) {
                 state.userSettings = mergeUserSettings({
                     ...state.userSettings,
-                    pinnedTrayTooltips: nextTooltips,
+                    pinnedTrayApps: nextPinnedTrayApps,
                 });
-                writeStoredUserSettings(state.userSettings);
+                persistSanitizedUserSettings();
                 renderForm();
                 broadcastUserSettings();
             }
 
-            function addPinnedTrayTooltip(rawValue) {
-                const tooltip = normalizeText(rawValue);
+            function addPinnedTrayApp(rawValue) {
+                const identity = normalizeTrayAppIdentity(rawValue);
 
-                if (!tooltip) {
+                if (!identity) {
                     return;
                 }
 
-                persistPinnedTrayTooltips([
-                    ...state.userSettings.pinnedTrayTooltips,
-                    tooltip,
+                persistPinnedTrayApps([
+                    ...state.userSettings.pinnedTrayApps,
+                    identity,
                 ]);
                 elements.trayPinInput.value = "";
             }
 
-            function removePinnedTrayTooltip(tooltip) {
-                persistPinnedTrayTooltips(
-                    state.userSettings.pinnedTrayTooltips.filter(
-                        (value) => value !== tooltip,
+            function removePinnedTrayApp(identity) {
+                persistPinnedTrayApps(
+                    state.userSettings.pinnedTrayApps.filter(
+                        (value) => value !== identity,
                     ),
                 );
             }
 
-            function togglePinnedTrayTooltip(tooltip) {
-                if (state.userSettings.pinnedTrayTooltips.includes(tooltip)) {
-                    removePinnedTrayTooltip(tooltip);
+            function togglePinnedTrayApp(identity) {
+                if (state.userSettings.pinnedTrayApps.includes(identity)) {
+                    removePinnedTrayApp(identity);
                     return;
                 }
 
-                addPinnedTrayTooltip(tooltip);
+                addPinnedTrayApp(identity);
             }
 
             function broadcastUserSettings(settings = state.userSettings) {
@@ -959,15 +1183,42 @@
 
             function persistUserSettings() {
                 state.userSettings = collectFormSettings();
-                writeStoredUserSettings(state.userSettings);
+                persistSanitizedUserSettings();
                 renderPreview();
                 broadcastUserSettings();
             }
 
-            function loadUserSettings() {
-                state.userSettings = readStoredUserSettings();
-                writeStoredUserSettings(state.userSettings);
+            function loadUserSettings(storage = globalThis.localStorage) {
+                const { raw, settings, legacyPinnedTrayTooltips } =
+                    readStoredUserSettings(storage);
+
+                if (state.hasLoadedUserSettings && raw === state.userSettingsStorageRaw) {
+                    return state.userSettings;
+                }
+
+                state.userSettings = settings;
+                state.userSettingsStorageRaw = raw;
+                state.pendingLegacyPinnedTrayTooltips = Array.isArray(
+                    legacyPinnedTrayTooltips,
+                )
+                    ? [...legacyPinnedTrayTooltips]
+                    : [];
+                state.hasLoadedUserSettings = true;
+
+                const sanitizedRaw = JSON.stringify(state.userSettings);
+
+                if (
+                    legacyPinnedTrayTooltips.length ||
+                    (typeof raw === "string" && raw !== sanitizedRaw)
+                ) {
+                    state.userSettingsStorageRaw = writeStoredUserSettings(
+                        state.userSettings,
+                        storage,
+                    );
+                }
+
                 renderForm();
+                return state.userSettings;
             }
 
             function setupChannel() {
@@ -1009,12 +1260,12 @@
                     persistUserSettings();
                 });
                 elements.trayPinAdd.addEventListener("click", () => {
-                    addPinnedTrayTooltip(elements.trayPinInput.value);
+                    addPinnedTrayApp(elements.trayPinInput.value);
                 });
                 elements.trayPinInput.addEventListener("keydown", (event) => {
                     if (event?.key === "Enter") {
                         event.preventDefault();
-                        addPinnedTrayTooltip(elements.trayPinInput.value);
+                        addPinnedTrayApp(elements.trayPinInput.value);
                     }
                 });
             }
@@ -1036,14 +1287,6 @@
                 state.previewTimer = setInterval(() => {
                     renderPreview();
                 }, PREVIEW_REFRESH_INTERVAL);
-            }
-
-            function getDetectedTrayTooltips(systrayOutput) {
-                return [...new Set(
-                    (systrayOutput?.icons ?? [])
-                        .map((icon) => normalizeText(icon?.tooltip))
-                        .filter(Boolean),
-                )].sort((left, right) => left.localeCompare(right));
             }
 
             async function closeSettingsWindow() {
@@ -1077,10 +1320,11 @@
                 loadUserSettings();
                 startPreviewTicker();
                 providers.onOutput((output) => {
-                    state.detectedTrayTooltips = getDetectedTrayTooltips(
-                        output.systray,
-                    );
-                    renderPinnedTrayTooltips();
+                    state.latestSystrayOutput = output.systray;
+                    refreshDetectedTrayApps(output.systray);
+                    maybeMigrateLegacyPinnedTraySettings(output.systray);
+                    renderPinnedTrayApps();
+                    void refreshTrayAppProcessInfo(output.systray);
                 });
             }
 
