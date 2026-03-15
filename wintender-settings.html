@@ -395,6 +395,21 @@
 
                         <label class="setting-row">
                             <div class="setting-copy">
+                                <span class="setting-title">Now Playing</span>
+                                <span class="setting-description">
+                                    Show or hide the media session pill before
+                                    the tray icons.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-media" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
                                 <span class="setting-title">Tray</span>
                                 <span class="setting-description">
                                     Show pinned tray icons and the overflow
@@ -567,6 +582,7 @@
             const WINTENDER_SETTINGS_CHANNEL_NAME = "wintender-settings";
             const DEFAULT_USER_SETTINGS = Object.freeze({
                 showKomorebiWorkspaces: true,
+                showMedia: true,
                 showSystray: true,
                 showWeather: false,
                 showNetwork: true,
@@ -587,6 +603,7 @@
                 showKomorebiWorkspaces: document.getElementById(
                     "show-komorebi-workspaces",
                 ),
+                showMedia: document.getElementById("show-media"),
                 showSystray: document.getElementById("show-systray"),
                 showWeather: document.getElementById("show-weather"),
                 showNetwork: document.getElementById("show-network"),
@@ -678,6 +695,10 @@
                 if (typeof rawSettings.showKomorebiWorkspaces === "boolean") {
                     settings.showKomorebiWorkspaces =
                         rawSettings.showKomorebiWorkspaces;
+                }
+
+                if (typeof rawSettings.showMedia === "boolean") {
+                    settings.showMedia = rawSettings.showMedia;
                 }
 
                 if (typeof rawSettings.showSystray === "boolean") {
@@ -1102,6 +1123,7 @@
             function renderForm() {
                 elements.showKomorebiWorkspaces.checked =
                     state.userSettings.showKomorebiWorkspaces;
+                elements.showMedia.checked = state.userSettings.showMedia;
                 elements.showSystray.checked = state.userSettings.showSystray;
                 elements.showWeather.checked = state.userSettings.showWeather;
                 elements.showNetwork.checked = state.userSettings.showNetwork;
@@ -1116,6 +1138,7 @@
                 return mergeUserSettings({
                     showKomorebiWorkspaces:
                         elements.showKomorebiWorkspaces.checked,
+                    showMedia: elements.showMedia.checked,
                     showSystray: elements.showSystray.checked,
                     showWeather: elements.showWeather.checked,
                     showNetwork: elements.showNetwork.checked,
@@ -1244,6 +1267,7 @@
             function setupFormListeners() {
                 const toggleIds = [
                     "showKomorebiWorkspaces",
+                    "showMedia",
                     "showSystray",
                     "showWeather",
                     "showNetwork",

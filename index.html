@@ -74,6 +74,16 @@
                 overflow: hidden;
             }
 
+            .media-pill {
+                flex: 1 1 0;
+                min-width: 0;
+                overflow: hidden;
+            }
+
+            .right-status-item {
+                flex: 0 0 auto;
+            }
+
             .tray {
                 display: flex;
                 align-items: center;
@@ -112,12 +122,15 @@
                 color: var(--text-secondary);
             }
 
-            .media-text,
-            .workspace-text,
-            .weather-text,
-            .network-text,
-            .audio-text,
-            .battery-text {
+            .workspace-text {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .media-text {
+                flex: 1 1 auto;
+                min-width: 0;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -265,12 +278,21 @@
                 <div id="datetime" class="pill datetime"></div>
             </div>
             <div class="section section-right">
-                <div id="media" class="pill hidden"></div>
-                <div id="systray" class="tray hidden"></div>
-                <div id="weather" class="pill hidden"></div>
-                <div id="network" class="pill interactive hidden"></div>
-                <div id="audio" class="pill interactive hidden"></div>
-                <div id="battery" class="pill interactive hidden"></div>
+                <div id="media" class="pill media-pill hidden"></div>
+                <div id="systray" class="tray right-status-item hidden"></div>
+                <div id="weather" class="pill right-status-item hidden"></div>
+                <div
+                    id="network"
+                    class="pill interactive right-status-item hidden"
+                ></div>
+                <div
+                    id="audio"
+                    class="pill interactive right-status-item hidden"
+                ></div>
+                <div
+                    id="battery"
+                    class="pill interactive right-status-item hidden"
+                ></div>
             </div>
         </div>
         <script type="module">
@@ -314,6 +336,7 @@
             ];
             const DEFAULT_USER_SETTINGS = Object.freeze({
                 showKomorebiWorkspaces: true,
+                showMedia: true,
                 showSystray: true,
                 showWeather: false,
                 showNetwork: true,
@@ -472,6 +495,10 @@
                 if (typeof rawSettings.showKomorebiWorkspaces === "boolean") {
                     settings.showKomorebiWorkspaces =
                         rawSettings.showKomorebiWorkspaces;
+                }
+
+                if (typeof rawSettings.showMedia === "boolean") {
+                    settings.showMedia = rawSettings.showMedia;
                 }
 
                 if (typeof rawSettings.showSystray === "boolean") {
@@ -2299,16 +2326,23 @@
             }
 
             function renderMedia(mediaOutput) {
-                const state = getMediaState(mediaOutput);
+                const mediaState = getMediaState(mediaOutput);
                 clearElement(elements.media);
 
-                if (!state) {
+                if (!state.userSettings.showMedia) {
                     toggleHidden(elements.media, true);
                     return;
                 }
 
-                elements.media.appendChild(iconSpan(state.icon));
-                elements.media.appendChild(textSpan("media-text", state.text));
+                if (!mediaState) {
+                    toggleHidden(elements.media, true);
+                    return;
+                }
+
+                elements.media.appendChild(iconSpan(mediaState.icon));
+                elements.media.appendChild(
+                    textSpan("media-text", mediaState.text),
+                );
                 toggleHidden(elements.media, false);
             }
 
