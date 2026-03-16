@@ -395,6 +395,35 @@
 
                         <label class="setting-row">
                             <div class="setting-copy">
+                                <span class="setting-title">Power Button</span>
+                                <span class="setting-description">
+                                    Show or hide the left power button.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-power" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
+                                <span class="setting-title">Now Playing</span>
+                                <span class="setting-description">
+                                    Show or hide the media session pill before
+                                    the tray icons.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-media" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
                                 <span class="setting-title">Tray</span>
                                 <span class="setting-description">
                                     Show pinned tray icons and the overflow
@@ -566,7 +595,9 @@
             const WINTENDER_SETTINGS_STORAGE_KEY = "wintender:settings";
             const WINTENDER_SETTINGS_CHANNEL_NAME = "wintender-settings";
             const DEFAULT_USER_SETTINGS = Object.freeze({
+                showPower: true,
                 showKomorebiWorkspaces: true,
+                showMedia: true,
                 showSystray: true,
                 showWeather: false,
                 showNetwork: true,
@@ -584,9 +615,11 @@
             });
 
             const elements = {
+                showPower: document.getElementById("show-power"),
                 showKomorebiWorkspaces: document.getElementById(
                     "show-komorebi-workspaces",
                 ),
+                showMedia: document.getElementById("show-media"),
                 showSystray: document.getElementById("show-systray"),
                 showWeather: document.getElementById("show-weather"),
                 showNetwork: document.getElementById("show-network"),
@@ -675,9 +708,17 @@
                     return settings;
                 }
 
+                if (typeof rawSettings.showPower === "boolean") {
+                    settings.showPower = rawSettings.showPower;
+                }
+
                 if (typeof rawSettings.showKomorebiWorkspaces === "boolean") {
                     settings.showKomorebiWorkspaces =
                         rawSettings.showKomorebiWorkspaces;
+                }
+
+                if (typeof rawSettings.showMedia === "boolean") {
+                    settings.showMedia = rawSettings.showMedia;
                 }
 
                 if (typeof rawSettings.showSystray === "boolean") {
@@ -1100,8 +1141,10 @@
             }
 
             function renderForm() {
+                elements.showPower.checked = state.userSettings.showPower;
                 elements.showKomorebiWorkspaces.checked =
                     state.userSettings.showKomorebiWorkspaces;
+                elements.showMedia.checked = state.userSettings.showMedia;
                 elements.showSystray.checked = state.userSettings.showSystray;
                 elements.showWeather.checked = state.userSettings.showWeather;
                 elements.showNetwork.checked = state.userSettings.showNetwork;
@@ -1114,8 +1157,10 @@
 
             function collectFormSettings() {
                 return mergeUserSettings({
+                    showPower: elements.showPower.checked,
                     showKomorebiWorkspaces:
                         elements.showKomorebiWorkspaces.checked,
+                    showMedia: elements.showMedia.checked,
                     showSystray: elements.showSystray.checked,
                     showWeather: elements.showWeather.checked,
                     showNetwork: elements.showNetwork.checked,
@@ -1243,7 +1288,9 @@
 
             function setupFormListeners() {
                 const toggleIds = [
+                    "showPower",
                     "showKomorebiWorkspaces",
+                    "showMedia",
                     "showSystray",
                     "showWeather",
                     "showNetwork",
