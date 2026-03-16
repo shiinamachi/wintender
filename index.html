@@ -80,6 +80,7 @@
                 overflow: hidden;
             }
 
+            .left-status-item,
             .right-status-item {
                 flex: 0 0 auto;
             }
@@ -153,6 +154,10 @@
             }
 
             .interactive:hover {
+                background: var(--hover);
+            }
+
+            .interactive-active {
                 background: var(--hover);
             }
 
@@ -236,7 +241,8 @@
                 z-index: 20;
             }
 
-            .top-bar-context-menu-item {
+            .top-bar-context-menu-item,
+            .power-menu-item {
                 display: flex;
                 align-items: center;
                 gap: 8px;
@@ -255,9 +261,54 @@
                     color 0.15s ease;
             }
 
-            .top-bar-context-menu-item:hover {
+            .top-bar-context-menu-item:hover,
+            .power-menu-item:hover {
                 background: var(--hover);
                 color: var(--accent);
+            }
+
+            #power .status-icon {
+                font-size: 14px;
+            }
+
+            .power-menu {
+                position: absolute;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                min-width: 180px;
+                padding: 6px;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                background: rgba(24, 24, 30, 0.96);
+                backdrop-filter: blur(18px);
+                -webkit-backdrop-filter: blur(18px);
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+                left: 14px;
+                top: 38px;
+                z-index: 20;
+            }
+
+            .power-menu-item-danger:hover {
+                background: rgba(243, 139, 168, 0.15);
+                color: var(--warning);
+            }
+
+            .power-menu-separator {
+                height: 1px;
+                margin: 4px 10px;
+                background: var(--border);
+            }
+
+            .power-menu-status {
+                margin: 2px 4px 0;
+                padding: 6px 8px 0;
+                border-top: 1px solid var(--border);
+                color: var(--warning);
+                font-size: 11px;
+                line-height: 1.4;
+                white-space: normal;
+                overflow-wrap: anywhere;
             }
 
             .warning {
@@ -272,6 +323,14 @@
     <body>
         <div class="bar">
             <div class="section section-left">
+                <div id="power" class="pill interactive left-status-item"
+                    role="button"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    tabindex="0"
+                >
+                    <span class="status-icon">󰐥</span>
+                </div>
                 <div id="workspaces" class="workspaces hidden"></div>
             </div>
             <div class="section section-center">
@@ -317,9 +376,18 @@
             const QUICK_SETTINGS_POPUP_HEIGHT = 580;
             const WINTENDER_SETTINGS_WIDTH = 420;
             const WINTENDER_SETTINGS_HEIGHT = 420;
+            const POWERSHELL_BASE_ARGS = [
+                "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
+            ];
             const TOP_BAR_HEIGHT = 32;
             const TOP_BAR_CONTEXT_MENU_WIDTH = 172;
             const TOP_BAR_CONTEXT_MENU_MARGIN = 8;
+            const POWER_MENU_WIDTH = 180;
+            const POWER_MENU_MARGIN = 8;
+            const POWER_AVAILABILITY_CACHE_DURATION_MS = 30000;
             const ZEBAR_SETTINGS_WINDOW_TIMEOUT_MS = 1500;
             const ZEBAR_TRAY_TOOLTIP_PREFIX = "Zebar v";
             const TASK_MANAGER_PROGRAM = "taskmgr.exe";
@@ -335,6 +403,7 @@
                 "komorebic.exe",
             ];
             const DEFAULT_USER_SETTINGS = Object.freeze({
+                showPower: true,
                 showKomorebiWorkspaces: true,
                 showMedia: true,
                 showSystray: true,
@@ -357,7 +426,10 @@
                 network: document.getElementById("network"),
                 audio: document.getElementById("audio"),
                 battery: document.getElementById("battery"),
+                power: document.getElementById("power"),
                 topBarContextMenu: null,
+                powerMenu: null,
+                powerMenuStatus: null,
             };
 
             const providers = zebar.createProviderGroup({
@@ -388,6 +460,19 @@
                 cellularSignalRequest: null,
                 weatherProviderGroup: null,
                 topBarContextMenuOpen: false,
+                powerMenuOpen: false,
+                powerAvailabilityRequest: null,
+                powerAvailability: {
+                    sleepSupported: null,
+                    hibernateSupported: null,
+                    modernStandbySupported: null,
+                    reasonsByAction: {
+                        sleep: "",
+                        hibernate: "",
+                    },
+                    checkedAt: 0,
+                },
+                powerMenuStatusText: "",
                 userSettings: { ...DEFAULT_USER_SETTINGS },
                 userSettingsStorageRaw: null,
                 userSettingsChannel: null,
@@ -436,6 +521,32 @@
 
             function normalizeText(text) {
                 return typeof text === "string" ? text.trim() : "";
+            }
+
+            function encodePowerShellScript(script) {
+                const text = String(script ?? "");
+                let binary = "";
+
+                for (let index = 0; index < text.length; index += 1) {
+                    const codeUnit = text.charCodeAt(index);
+
+                    binary += String.fromCharCode(
+                        codeUnit & 0xff,
+                        (codeUnit >> 8) & 0xff,
+                    );
+                }
+
+                return globalThis.btoa(binary);
+            }
+
+            function buildPowerShellArgs(script) {
+                return `${POWERSHELL_BASE_ARGS.join(" ")} -EncodedCommand ${encodePowerShellScript(
+                    script,
+                )}`;
+            }
+
+            async function execPowerShell(script) {
+                return zebar.shellExec("powershell.exe", buildPowerShellArgs(script));
             }
 
             function resolvePreferredLocale(locale) {
@@ -490,6 +601,10 @@
 
                 if (!rawSettings || typeof rawSettings !== "object") {
                     return settings;
+                }
+
+                if (typeof rawSettings.showPower === "boolean") {
+                    settings.showPower = rawSettings.showPower;
                 }
 
                 if (typeof rawSettings.showKomorebiWorkspaces === "boolean") {
@@ -686,6 +801,7 @@
             }
 
             function renderAllCurrentState() {
+                renderPower();
                 renderKomorebi(state.latestKomorebiOutput);
                 renderDate(state.latestDateOutput);
                 renderMedia(state.latestMediaOutput);
@@ -782,6 +898,8 @@
                     state.userSettingsStorageRaw =
                         writeStoredUserSettings(nextSettings);
                 }
+
+                renderPower();
             }
 
             function setupUserSettingsSync() {
@@ -1932,6 +2050,437 @@
                 return menu;
             }
 
+            function createPowerMenuItem({
+                action,
+                icon,
+                label,
+                danger = false,
+            }) {
+                const button = document.createElement("button");
+
+                button.className =
+                    "power-menu-item" + (danger ? " power-menu-item-danger" : "");
+                button.type = "button";
+                button.dataset.action = action;
+                button.appendChild(iconSpan(icon));
+                button.appendChild(textSpan("power-menu-text", label));
+                button.addEventListener("click", () => {
+                    void runPowerAction(action);
+                });
+
+                return button;
+            }
+
+            function createPowerMenu() {
+                if (elements.powerMenu) {
+                    return elements.powerMenu;
+                }
+
+                const menu = document.createElement("div");
+                const items = [
+                    { action: "sleep", icon: "󰒲", label: "Sleep" },
+                    {
+                        action: "hibernate",
+                        icon: "󰋊",
+                        label: "Hibernate",
+                    },
+                    {
+                        action: "shutdown",
+                        icon: "󰐥",
+                        label: "Shut down",
+                        danger: true,
+                    },
+                    {
+                        action: "restart",
+                        icon: "󰜉",
+                        label: "Restart",
+                        danger: true,
+                    },
+                ];
+                const secondaryItems = [
+                    { action: "sign-out", icon: "󰍃", label: "Sign out" },
+                    { action: "lock", icon: "󰌾", label: "Lock" },
+                ];
+
+                menu.className = "power-menu hidden";
+                menu.setAttribute("role", "menu");
+
+                items.forEach((item) => {
+                    menu.appendChild(createPowerMenuItem(item));
+                });
+
+                const separator = document.createElement("div");
+
+                separator.className = "power-menu-separator";
+                menu.appendChild(separator);
+
+                secondaryItems.forEach((item) => {
+                    menu.appendChild(createPowerMenuItem(item));
+                });
+
+                const status = document.createElement("div");
+
+                status.className = "power-menu-status hidden";
+                menu.appendChild(status);
+
+                document.body.appendChild(menu);
+                elements.powerMenu = menu;
+                elements.powerMenuStatus = status;
+                return menu;
+            }
+
+            function getPowerActionItem(action) {
+                return (
+                    elements.powerMenu?.querySelector(
+                        `[data-action="${action}"]`,
+                    ) ?? null
+                );
+            }
+
+            function setPowerMenuStatus(text) {
+                if (!elements.powerMenuStatus) {
+                    createPowerMenu();
+                }
+
+                const status = elements.powerMenuStatus;
+                const message = normalizeText(text);
+
+                if (!status) {
+                    return;
+                }
+
+                state.powerMenuStatusText = message;
+                status.textContent = message;
+                toggleHidden(status, !message);
+
+                if (state.powerMenuOpen) {
+                    void syncTopBarOverlaySize();
+                }
+            }
+
+            function clearPowerMenuStatus() {
+                setPowerMenuStatus("");
+            }
+
+            function parsePowercfgStateBlocks(sectionText) {
+                const normalizedSection = normalizeText(
+                    String(sectionText ?? "").replace(/\r/g, ""),
+                );
+
+                if (!normalizedSection) {
+                    return [];
+                }
+
+                return normalizedSection
+                    .split(/\n\s*\n/g)
+                    .map((block) =>
+                        block
+                            .split("\n")
+                            .map((line) => normalizeText(line))
+                            .filter(Boolean),
+                    )
+                    .filter((lines) => lines.length)
+                    .map((lines) => ({
+                        name: lines[0],
+                        reasons: lines.slice(1),
+                    }));
+            }
+
+            function findPowercfgStateBlock(blocks, pattern) {
+                return (
+                    blocks.find((block) => pattern.test(block?.name ?? "")) ??
+                    null
+                );
+            }
+
+            function getPowerActionUnavailableReason(action) {
+                return normalizeText(
+                    state.powerAvailability?.reasonsByAction?.[action],
+                );
+            }
+
+            function buildSleepPowerShellScript() {
+                return `$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class WintenderSleep {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LUID {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct TOKEN_PRIVILEGES {
+        public uint PrivilegeCount;
+        public LUID Luid;
+        public uint Attributes;
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool OpenProcessToken(
+        IntPtr ProcessHandle,
+        uint DesiredAccess,
+        out IntPtr TokenHandle
+    );
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool LookupPrivilegeValue(
+        string lpSystemName,
+        string lpName,
+        out LUID lpLuid
+    );
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool AdjustTokenPrivileges(
+        IntPtr TokenHandle,
+        bool DisableAllPrivileges,
+        ref TOKEN_PRIVILEGES NewState,
+        uint BufferLength,
+        IntPtr PreviousState,
+        IntPtr ReturnLength
+    );
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    public static extern bool SetSuspendState(
+        bool hibernate,
+        bool forceCritical,
+        bool disableWakeEvent
+    );
+}
+"@
+
+$token = [IntPtr]::Zero
+$opened = [WintenderSleep]::OpenProcessToken(
+    [System.Diagnostics.Process]::GetCurrentProcess().Handle,
+    0x20 -bor 0x8,
+    [ref]$token
+)
+
+if (-not $opened) {
+    throw "OpenProcessToken failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+}
+
+try {
+    $luid = New-Object WintenderSleep+LUID
+
+    if (-not [WintenderSleep]::LookupPrivilegeValue($null, 'SeShutdownPrivilege', [ref]$luid)) {
+        throw "LookupPrivilegeValue failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+
+    $tokenPrivileges = New-Object WintenderSleep+TOKEN_PRIVILEGES
+    $tokenPrivileges.PrivilegeCount = 1
+    $tokenPrivileges.Luid = $luid
+    $tokenPrivileges.Attributes = 0x2
+
+    $adjusted = [WintenderSleep]::AdjustTokenPrivileges(
+        $token,
+        $false,
+        [ref]$tokenPrivileges,
+        0,
+        [IntPtr]::Zero,
+        [IntPtr]::Zero
+    )
+    $adjustError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+
+    if (-not $adjusted -or $adjustError -ne 0) {
+        throw "AdjustTokenPrivileges failed: $adjustError"
+    }
+
+    $sleepResult = [WintenderSleep]::SetSuspendState($false, $false, $false)
+    $sleepError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+
+    if (-not $sleepResult) {
+        throw "SetSuspendState failed: $sleepError"
+    }
+} finally {
+    if ($token -ne [IntPtr]::Zero) {
+        [WintenderSleep]::CloseHandle($token) | Out-Null
+    }
+}`;
+            }
+
+            function buildModernStandbySleepPowerShellScript() {
+                return `$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class WintenderModernStandby {
+    public const int HWND_BROADCAST = 0xffff;
+    public const int WM_SYSCOMMAND = 0x0112;
+    public const int SC_MONITORPOWER = 0xF170;
+    public const int MONITOR_OFF = 2;
+    public const int SMTO_ABORTIFHUNG = 0x0002;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SendMessageTimeout(
+        IntPtr hWnd,
+        uint Msg,
+        IntPtr wParam,
+        IntPtr lParam,
+        uint fuFlags,
+        uint uTimeout,
+        out IntPtr lpdwResult
+    );
+}
+"@
+
+$result = [IntPtr]::Zero
+$response = [WintenderModernStandby]::SendMessageTimeout(
+    [IntPtr][WintenderModernStandby]::HWND_BROADCAST,
+    [uint32][WintenderModernStandby]::WM_SYSCOMMAND,
+    [IntPtr][WintenderModernStandby]::SC_MONITORPOWER,
+    [IntPtr][WintenderModernStandby]::MONITOR_OFF,
+    [uint32][WintenderModernStandby]::SMTO_ABORTIFHUNG,
+    1000,
+    [ref]$result
+)
+$lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+
+if ($response -eq [IntPtr]::Zero) {
+    throw "SendMessageTimeout failed: $lastError"
+}`;
+            }
+
+            function parsePowerAvailabilityOutput(output) {
+                const normalizedOutput = String(output ?? "").replace(/\r/g, "");
+                const availableSection =
+                    normalizedOutput.match(
+                        /The following sleep states are available on this system:\s*([\s\S]*?)(?:The following sleep states are not available on this system:|$)/i,
+                    )?.[1] ?? "";
+                const unavailableSection =
+                    normalizedOutput.match(
+                        /The following sleep states are not available on this system:\s*([\s\S]*)$/i,
+                    )?.[1] ?? "";
+                const availableBlocks =
+                    parsePowercfgStateBlocks(availableSection);
+                const unavailableBlocks =
+                    parsePowercfgStateBlocks(unavailableSection);
+                const availableStandby = findPowercfgStateBlock(
+                    availableBlocks,
+                    /^Standby\b/i,
+                );
+                const unavailableStandby = findPowercfgStateBlock(
+                    unavailableBlocks,
+                    /^Standby\b/i,
+                );
+                const availableHibernate = findPowercfgStateBlock(
+                    availableBlocks,
+                    /^Hibernate\b/i,
+                );
+                const unavailableHibernate = findPowercfgStateBlock(
+                    unavailableBlocks,
+                    /^Hibernate\b/i,
+                );
+
+                return {
+                    sleepSupported: availableStandby
+                        ? true
+                        : unavailableStandby
+                          ? false
+                          : null,
+                    hibernateSupported: availableHibernate
+                        ? true
+                        : unavailableHibernate
+                          ? false
+                          : null,
+                    modernStandbySupported: availableStandby
+                        ? /S0 Low Power Idle/i.test(
+                              availableStandby.name ?? "",
+                          )
+                        : null,
+                    reasonsByAction: {
+                        sleep: normalizeText(
+                            unavailableStandby?.reasons?.join(" "),
+                        ),
+                        hibernate: normalizeText(
+                            unavailableHibernate?.reasons?.join(" "),
+                        ),
+                    },
+                    checkedAt: Date.now(),
+                };
+            }
+
+            function shouldRefreshPowerAvailability(now = Date.now()) {
+                return (
+                    !Number.isFinite(state.powerAvailability.checkedAt) ||
+                    state.powerAvailability.checkedAt <= 0 ||
+                    now - state.powerAvailability.checkedAt >=
+                        POWER_AVAILABILITY_CACHE_DURATION_MS
+                );
+            }
+
+            function updatePowerMenuAvailability() {
+                const availability = state.powerAvailability;
+                const sleepItem = getPowerActionItem("sleep");
+                const hibernateItem = getPowerActionItem("hibernate");
+
+                if (sleepItem) {
+                    toggleHidden(sleepItem, availability.sleepSupported === false);
+                }
+
+                if (hibernateItem) {
+                    toggleHidden(hibernateItem, availability.hibernateSupported === false);
+                }
+
+                if (state.powerMenuOpen) {
+                    void syncTopBarOverlaySize();
+                }
+            }
+
+            async function refreshPowerAvailability() {
+                if (state.powerAvailabilityRequest) {
+                    return state.powerAvailabilityRequest;
+                }
+
+                if (!shouldRefreshPowerAvailability()) {
+                    updatePowerMenuAvailability();
+                    return state.powerAvailability;
+                }
+
+                state.powerAvailabilityRequest = (async () => {
+                    try {
+                        const result = await zebar.shellExec("powercfg.exe", "/a");
+
+                        state.powerAvailability = parsePowerAvailabilityOutput(
+                            result.stdout,
+                        );
+                        updatePowerMenuAvailability();
+                    } catch (error) {
+                        state.powerAvailability = {
+                            ...state.powerAvailability,
+                            checkedAt: Date.now(),
+                        };
+
+                        if (state.powerMenuOpen) {
+                            setPowerMenuStatus(
+                                `Could not verify Sleep/Hibernate support: ${
+                                    normalizeText(error?.message) ||
+                                    "Unknown error."
+                                }`,
+                            );
+                        }
+
+                        console.error(
+                            "Failed to refresh power availability",
+                            error,
+                        );
+                    } finally {
+                        state.powerAvailabilityRequest = null;
+                    }
+
+                    return state.powerAvailability;
+                })();
+
+                return state.powerAvailabilityRequest;
+            }
+
             function shouldHandleTopBarContextMenu(target) {
                 if (!state.topBarContextMenuOpen && !elements.topBarContextMenu) {
                     createTopBarContextMenu();
@@ -1979,6 +2528,42 @@
                 };
             }
 
+            function getPowerMenuPosition() {
+                const menu = createPowerMenu();
+                const buttonRect =
+                    typeof elements.power?.getBoundingClientRect === "function"
+                        ? elements.power.getBoundingClientRect()
+                        : null;
+                const menuRect =
+                    typeof menu.getBoundingClientRect === "function"
+                        ? menu.getBoundingClientRect()
+                        : null;
+                const menuWidth =
+                    Number.isFinite(menuRect?.width) && menuRect.width > 0
+                        ? Math.ceil(menuRect.width)
+                        : POWER_MENU_WIDTH;
+                const viewportWidth =
+                    Number.isFinite(window?.innerWidth) &&
+                    window.innerWidth > 0
+                        ? window.innerWidth
+                        : POWER_MENU_WIDTH + POWER_MENU_MARGIN * 2;
+                const maxLeft = Math.max(
+                    POWER_MENU_MARGIN,
+                    viewportWidth - menuWidth - POWER_MENU_MARGIN,
+                );
+                const buttonLeft = Number.isFinite(buttonRect?.left)
+                    ? Math.round(buttonRect.left)
+                    : POWER_MENU_MARGIN;
+                const buttonBottom = Number.isFinite(buttonRect?.bottom)
+                    ? Math.round(buttonRect.bottom)
+                    : TOP_BAR_HEIGHT;
+
+                return {
+                    left: clamp(buttonLeft, POWER_MENU_MARGIN, maxLeft),
+                    top: Math.max(TOP_BAR_HEIGHT + 6, buttonBottom + 6),
+                };
+            }
+
             async function getTauriDpiModule() {
                 const customLoader =
                     globalThis.__WINTENDER_TOP_BAR_DPI_MODULE_LOADER__;
@@ -1990,7 +2575,58 @@
                 return import("https://esm.sh/@tauri-apps/api@2.0.2/dpi");
             }
 
-            async function setTopBarContextMenuExpanded(expanded) {
+            function getExpandedTopBarMenu() {
+                if (state.powerMenuOpen && elements.powerMenu) {
+                    return elements.powerMenu;
+                }
+
+                if (state.topBarContextMenuOpen && elements.topBarContextMenu) {
+                    return elements.topBarContextMenu;
+                }
+
+                return null;
+            }
+
+            function getTopBarOverlayWidth(menu) {
+                if (Number.isFinite(window?.innerWidth) && window.innerWidth > 0) {
+                    return window.innerWidth;
+                }
+
+                if (menu === elements.powerMenu) {
+                    return POWER_MENU_WIDTH + POWER_MENU_MARGIN * 2;
+                }
+
+                return TOP_BAR_CONTEXT_MENU_WIDTH + TOP_BAR_CONTEXT_MENU_MARGIN * 2;
+            }
+
+            function getTopBarOverlayHeight(menu) {
+                if (!menu) {
+                    return TOP_BAR_HEIGHT;
+                }
+
+                const rect =
+                    typeof menu.getBoundingClientRect === "function"
+                        ? menu.getBoundingClientRect()
+                        : null;
+                const measuredHeight =
+                    Number.isFinite(rect?.height) && rect.height > 0
+                        ? Math.ceil(rect.height)
+                        : null;
+                const fallbackHeight =
+                    Math.max(1, menu.children?.length ?? 0) * 34 + 12;
+                const menuMargin =
+                    menu === elements.powerMenu
+                        ? POWER_MENU_MARGIN
+                        : TOP_BAR_CONTEXT_MENU_MARGIN;
+
+                return (
+                    TOP_BAR_HEIGHT +
+                    (measuredHeight ?? fallbackHeight) +
+                    menuMargin * 2
+                );
+            }
+
+            async function syncTopBarOverlaySize() {
                 if (globalThis.__WINTENDER_TOP_BAR_TEST_MODE__) {
                     return;
                 }
@@ -2001,32 +2637,15 @@
                     return;
                 }
 
-                const width =
-                    Number.isFinite(window?.innerWidth) && window.innerWidth > 0
-                        ? window.innerWidth
-                        : TOP_BAR_CONTEXT_MENU_WIDTH +
-                          TOP_BAR_CONTEXT_MENU_MARGIN * 2;
-                const contextMenuHeight =
-                    Math.max(
-                        1,
-                        elements.topBarContextMenu?.children?.length ?? 0,
-                    ) *
-                        34 +
-                    12;
-                const height = expanded
-                    ? TOP_BAR_HEIGHT +
-                      contextMenuHeight +
-                      TOP_BAR_CONTEXT_MENU_MARGIN * 2
-                    : TOP_BAR_HEIGHT;
+                const expandedMenu = getExpandedTopBarMenu();
+                const width = getTopBarOverlayWidth(expandedMenu);
+                const height = getTopBarOverlayHeight(expandedMenu);
 
                 try {
                     const { LogicalSize } = await getTauriDpiModule();
                     await tauriWindow.setSize(new LogicalSize(width, height));
                 } catch (error) {
-                    console.error(
-                        "Failed to resize top bar for context menu",
-                        error,
-                    );
+                    console.error("Failed to resize top bar overlay", error);
                 }
             }
 
@@ -2034,6 +2653,8 @@
                 clientX = 0,
                 clientY = 0,
             } = {}) {
+                closePowerMenu({ skipResize: true });
+
                 const menu = createTopBarContextMenu();
                 const position = getTopBarContextMenuPosition(clientX, clientY);
 
@@ -2041,10 +2662,10 @@
                 menu.style.top = `${position.top}px`;
                 toggleHidden(menu, false);
                 state.topBarContextMenuOpen = true;
-                void setTopBarContextMenuExpanded(true);
+                void syncTopBarOverlaySize();
             }
 
-            function closeTopBarContextMenu() {
+            function closeTopBarContextMenu({ skipResize = false } = {}) {
                 const menu = elements.topBarContextMenu;
 
                 if (!menu) {
@@ -2054,7 +2675,123 @@
 
                 toggleHidden(menu, true);
                 state.topBarContextMenuOpen = false;
-                void setTopBarContextMenuExpanded(false);
+
+                if (!skipResize) {
+                    void syncTopBarOverlaySize();
+                }
+            }
+
+            function setPowerButtonExpanded(expanded) {
+                elements.power?.classList.toggle("interactive-active", expanded);
+                elements.power?.setAttribute(
+                    "aria-expanded",
+                    expanded ? "true" : "false",
+                );
+            }
+
+            function getPowerActionLabel(action) {
+                const labels = {
+                    sleep: "Sleep",
+                    hibernate: "Hibernate",
+                    shutdown: "Shut down",
+                    restart: "Restart",
+                    "sign-out": "Sign out",
+                    lock: "Lock",
+                };
+
+                return labels[action] ?? "Power action";
+            }
+
+            async function runPowerAction(action) {
+                clearPowerMenuStatus();
+
+                if (
+                    (action === "sleep" &&
+                        state.powerAvailability.sleepSupported === false) ||
+                    (action === "hibernate" &&
+                        state.powerAvailability.hibernateSupported === false)
+                ) {
+                    setPowerMenuStatus(
+                        `${getPowerActionLabel(action)} is unavailable: ${
+                            getPowerActionUnavailableReason(action) ||
+                            "This power state is not available on this PC."
+                        }`,
+                    );
+                    return;
+                }
+
+                const commands = {
+                    "sleep": () =>
+                        state.powerAvailability.modernStandbySupported === true
+                            ? execPowerShell(
+                                  buildModernStandbySleepPowerShellScript(),
+                              )
+                            : execPowerShell(buildSleepPowerShellScript()),
+                    "hibernate": () => zebar.shellExec("shutdown.exe", "/h"),
+                    "shutdown": () => zebar.shellExec("shutdown.exe", "/s /t 0"),
+                    "restart": () => zebar.shellExec("shutdown.exe", "/r /t 0"),
+                    "sign-out": () => zebar.shellExec("shutdown.exe", "/l"),
+                    "lock": () => zebar.shellExec("rundll32.exe", "user32.dll,LockWorkStation"),
+                };
+                const execute = commands[action];
+
+                if (!execute) {
+                    return;
+                }
+
+                try {
+                    await execute();
+                    closePowerMenu();
+                } catch (error) {
+                    setPowerMenuStatus(
+                        `${getPowerActionLabel(action)} failed: ${
+                            normalizeText(error?.stderr) ||
+                            normalizeText(error?.stdout) ||
+                            normalizeText(error?.message) ||
+                            "Unknown error."
+                        }`,
+                    );
+                    console.error(`Failed to run power action: ${action}`, error);
+                }
+            }
+
+            function openPowerMenu() {
+                if (!state.userSettings.showPower) {
+                    return;
+                }
+
+                closeTopBarContextMenu({ skipResize: true });
+
+                const menu = createPowerMenu();
+                const position = getPowerMenuPosition();
+
+                clearPowerMenuStatus();
+                updatePowerMenuAvailability();
+                menu.style.left = `${position.left}px`;
+                menu.style.top = `${position.top}px`;
+                toggleHidden(menu, false);
+                state.powerMenuOpen = true;
+                setPowerButtonExpanded(true);
+                void syncTopBarOverlaySize();
+                void refreshPowerAvailability();
+            }
+
+            function closePowerMenu({ skipResize = false } = {}) {
+                const menu = elements.powerMenu;
+
+                if (!menu) {
+                    state.powerMenuOpen = false;
+                    setPowerButtonExpanded(false);
+                    return;
+                }
+
+                toggleHidden(menu, true);
+                state.powerMenuOpen = false;
+                setPowerButtonExpanded(false);
+
+                if (!skipResize) {
+                    void syncTopBarOverlaySize();
+                }
             }
 
             async function getTauriWebviewWindowModule() {
@@ -2243,40 +2980,70 @@
                 openTopBarContextMenu(event);
             }
 
-            function handleTopBarContextMenuClick(event) {
-                if (!state.topBarContextMenuOpen) {
+            function handlePowerButtonClick(event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (state.powerMenuOpen) {
+                    closePowerMenu();
                     return;
                 }
 
-                if (elements.topBarContextMenu?.contains(event?.target)) {
+                openPowerMenu();
+            }
+
+            function handleTopBarOverlayClick(event) {
+                if (
+                    state.topBarContextMenuOpen &&
+                    !elements.topBarContextMenu?.contains(event?.target)
+                ) {
+                    closeTopBarContextMenu();
+                }
+
+                if (
+                    state.powerMenuOpen &&
+                    !elements.powerMenu?.contains(event?.target) &&
+                    !elements.power?.contains(event?.target)
+                ) {
+                    closePowerMenu();
+                }
+            }
+
+            function handleTopBarOverlayKeydown(event) {
+                if (event?.key !== "Escape") {
                     return;
                 }
 
                 closeTopBarContextMenu();
+                closePowerMenu();
             }
 
-            function handleTopBarContextMenuKeydown(event) {
-                if (!state.topBarContextMenuOpen) {
-                    return;
-                }
+            function handleTopBarOverlayBlur() {
+                closeTopBarContextMenu();
+                closePowerMenu();
+            }
 
-                if (event?.key === "Escape") {
-                    closeTopBarContextMenu();
+            function handlePowerButtonKeydown(event) {
+                if (event?.key === "Enter" || event?.key === " ") {
+                    handlePowerButtonClick(event);
                 }
             }
 
-            function setupTopBarContextMenu() {
+            function setupTopBarMenus() {
                 createTopBarContextMenu();
+                createPowerMenu();
+                elements.power?.addEventListener("click", handlePowerButtonClick);
+                elements.power?.addEventListener(
+                    "keydown",
+                    handlePowerButtonKeydown,
+                );
                 document.addEventListener(
                     "contextmenu",
                     handleTopBarContextMenu,
                 );
-                document.addEventListener("click", handleTopBarContextMenuClick);
-                document.addEventListener(
-                    "keydown",
-                    handleTopBarContextMenuKeydown,
-                );
-                window.addEventListener("blur", closeTopBarContextMenu);
+                document.addEventListener("click", handleTopBarOverlayClick);
+                document.addEventListener("keydown", handleTopBarOverlayKeydown);
+                window.addEventListener("blur", handleTopBarOverlayBlur);
             }
 
             function buildTrayButton(icon, systrayOutput) {
@@ -2644,8 +3411,18 @@
                 toggleHidden(elements.battery, false);
             }
 
+            function renderPower() {
+                if (!state.userSettings.showPower) {
+                    closePowerMenu();
+                    toggleHidden(elements.power, true);
+                    return;
+                }
+
+                toggleHidden(elements.power, false);
+            }
+
             initializeUserSettings();
-            setupTopBarContextMenu();
+            setupTopBarMenus();
 
             const TEST_HOOKS = {
                 DEFAULT_USER_SETTINGS,
@@ -2653,6 +3430,7 @@
                 ensureWeatherProvider,
                 elements,
                 closeTopBarContextMenu,
+                closePowerMenu,
                 formatClockText,
                 getQuickSettingsPlacement,
                 getTrayGroups,
@@ -2661,6 +3439,7 @@
                 getUserSettings: () => ({ ...state.userSettings }),
                 getZebarSystrayIcon,
                 openTaskManager,
+                openPowerMenu,
                 openTopBarContextMenu,
                 openWintenderSettings,
                 openZebarSettings,
@@ -2671,8 +3450,10 @@
                 renderNetwork,
                 renderAudio,
                 renderBattery,
+                runPowerAction,
                 runTopBarContextMenuAction,
                 setUserSettings,
+                syncTopBarOverlaySize,
                 syncUserSettingsFromStorage,
                 shouldHandleTopBarContextMenu,
                 triggerZebarSystrayLeftClick,

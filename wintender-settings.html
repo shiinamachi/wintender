@@ -395,6 +395,20 @@
 
                         <label class="setting-row">
                             <div class="setting-copy">
+                                <span class="setting-title">Power Button</span>
+                                <span class="setting-description">
+                                    Show or hide the left power button.
+                                </span>
+                            </div>
+                            <span class="toggle">
+                                <input id="show-power" type="checkbox" />
+                                <span class="toggle-track"></span>
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+
+                        <label class="setting-row">
+                            <div class="setting-copy">
                                 <span class="setting-title">Now Playing</span>
                                 <span class="setting-description">
                                     Show or hide the media session pill before
@@ -581,6 +595,7 @@
             const WINTENDER_SETTINGS_STORAGE_KEY = "wintender:settings";
             const WINTENDER_SETTINGS_CHANNEL_NAME = "wintender-settings";
             const DEFAULT_USER_SETTINGS = Object.freeze({
+                showPower: true,
                 showKomorebiWorkspaces: true,
                 showMedia: true,
                 showSystray: true,
@@ -600,6 +615,7 @@
             });
 
             const elements = {
+                showPower: document.getElementById("show-power"),
                 showKomorebiWorkspaces: document.getElementById(
                     "show-komorebi-workspaces",
                 ),
@@ -690,6 +706,10 @@
 
                 if (!rawSettings || typeof rawSettings !== "object") {
                     return settings;
+                }
+
+                if (typeof rawSettings.showPower === "boolean") {
+                    settings.showPower = rawSettings.showPower;
                 }
 
                 if (typeof rawSettings.showKomorebiWorkspaces === "boolean") {
@@ -1121,6 +1141,7 @@
             }
 
             function renderForm() {
+                elements.showPower.checked = state.userSettings.showPower;
                 elements.showKomorebiWorkspaces.checked =
                     state.userSettings.showKomorebiWorkspaces;
                 elements.showMedia.checked = state.userSettings.showMedia;
@@ -1136,6 +1157,7 @@
 
             function collectFormSettings() {
                 return mergeUserSettings({
+                    showPower: elements.showPower.checked,
                     showKomorebiWorkspaces:
                         elements.showKomorebiWorkspaces.checked,
                     showMedia: elements.showMedia.checked,
@@ -1266,6 +1288,7 @@
 
             function setupFormListeners() {
                 const toggleIds = [
+                    "showPower",
                     "showKomorebiWorkspaces",
                     "showMedia",
                     "showSystray",
