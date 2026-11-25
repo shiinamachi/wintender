@@ -1396,6 +1396,24 @@
                 );
             }
 
+            // Runs a command and returns its stdout as text, requesting raw bytes so
+            // decodeShellOutputText can handle CP949. Falls back to Zebar's default
+            // UTF-8 decoding if the raw encoding option is rejected.
+            async function shellExecText(program, args) {
+                let result;
+
+                try {
+                    result = await zebar.shellExec(program, args, {
+                        encoding: "raw",
+                    });
+                } catch (error) {
+                    console.warn("Raw shell output failed; retrying as UTF-8", error);
+                    result = await zebar.shellExec(program, args);
+                }
+
+                return decodeShellOutputText(result?.stdout);
+            }
+
             // netsh writes in the console code page (CP949 on ko-KR), so the
             // output is requested raw and decoded here: strict UTF-8 first,
             // then EUC-KR (CP949), then lossy UTF-8.
@@ -2168,12 +2186,10 @@
 
                 state.cellularSignalRequest = (async () => {
                     try {
-                        const result = await zebar.shellExec(
+                        const stdout = await shellExecText(
                             "netsh.exe",
                             "mbn show interfaces",
-                            { encoding: "raw" },
                         );
-                        const stdout = decodeShellOutputText(result.stdout);
                         const signalStrength =
                             parseNetshCellularSignalStrength(stdout);
                         const providerName =
