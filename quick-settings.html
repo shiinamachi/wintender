@@ -652,6 +652,43 @@
         return typeof text === "string" ? text.trim() : "";
       }
 
+      // netsh writes in the console code page (CP949 on ko-KR), so its output
+      // is requested raw and decoded here: strict UTF-8 first, then EUC-KR
+      // (CP949), then lossy UTF-8.
+      function decodeShellOutputText(output) {
+        if (typeof output === "string") {
+          return output;
+        }
+
+        let bytes = null;
+
+        if (output instanceof Uint8Array) {
+          bytes = output;
+        } else if (Array.isArray(output)) {
+          bytes = Uint8Array.from(output);
+        } else if (output instanceof ArrayBuffer) {
+          bytes = new Uint8Array(output);
+        }
+
+        if (!bytes) {
+          return "";
+        }
+
+        for (const [label, fatal] of [
+          ["utf-8", true],
+          ["euc-kr", true],
+          ["utf-8", false],
+        ]) {
+          try {
+            return new TextDecoder(label, { fatal }).decode(bytes);
+          } catch {
+            // try the next encoding
+          }
+        }
+
+        return "";
+      }
+
       function quotePowerShellScript(script) {
         return `"${String(script).replace(/"/g, '\\"')}"`;
       }
@@ -914,7 +951,7 @@
             normalizeText(activeInterface?.description) ||
             "Cellular",
           meta: isConnected
-            ? "Connected"
+            ? normalizeText(activeInterface?.providerName) || "Connected"
             : normalizeText(activeInterface?.state) || "Available",
           isConnected,
         };
@@ -1032,13 +1069,23 @@
             return;
           }
 
-          const key = normalizeText(match[1]).toLowerCase();
+          // netsh uses Korean labels on ko-KR Windows.
+          const rawKey = normalizeText(match[1]).toLowerCase();
+          const key =
+            {
+              이름: "name",
+              설명: "description",
+              상태: "state",
+              신호: "signal",
+              "공급자 이름": "provider name",
+            }[rawKey] ?? rawKey;
           const value = normalizeText(match[2]);
 
           if (key === "name") {
             current = {
               name: value,
               description: "",
+              providerName: "",
               state: "",
               signalStrength: null,
               isConnected: value === activeName,
@@ -1053,11 +1100,13 @@
 
           if (key === "description") {
             current.description = value;
+          } else if (key === "provider name") {
+            current.providerName = value;
           } else if (key === "state") {
             current.state = value;
             current.isConnected =
               current.isConnected ||
-              normalizeText(value).toLowerCase() === "connected";
+              /^(?:connected|연결\s*됨)$/i.test(normalizeText(value));
           } else if (key === "signal") {
             const signalMatch = value.match(/(\d+)%/);
             current.signalStrength = signalMatch
@@ -1333,9 +1382,13 @@
         render();
 
         try {
-          const result = await zebar.shellExec("netsh.exe", "mbn show interfaces");
+          const result = await zebar.shellExec(
+            "netsh.exe",
+            "mbn show interfaces",
+            { encoding: "raw" },
+          );
           const interfaces = parseCellularInterfaces(
-            result.stdout,
+            decodeShellOutputText(result.stdout),
             state.output.network,
           );
           const profiles = [];
@@ -1345,11 +1398,12 @@
               const profileResult = await zebar.shellExec(
                 "netsh.exe",
                 `mbn show profiles interface="${escapeDoubleQuotes(item.name)}"`,
+                { encoding: "raw" },
               );
 
               profiles.push(
                 ...parseCellularProfiles(
-                  profileResult.stdout,
+                  decodeShellOutputText(profileResult.stdout),
                   item.name,
                   item.isConnected,
                 ),
@@ -2099,7 +2153,13 @@
             createListButton({
               icon: getCellularSignalIcon(activeInterface.signalStrength),
               title: activeInterface.name,
-              subtitle: normalizeText(activeInterface.state) || "Connected",
+              subtitle:
+                [
+                  normalizeText(activeInterface.providerName),
+                  normalizeText(activeInterface.state) || "Connected",
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
               tag: "Disconnect",
               onClick: () => {
                 void disconnectCellular(activeInterface.name);
@@ -2133,7 +2193,9 @@
         return renderListView({
           title: "Cellular",
           subtitle:
-            normalizeText(activeInterface?.name) || "Select a cellular profile",
+            normalizeText(activeInterface?.providerName) ||
+            normalizeText(activeInterface?.name) ||
+            "Select a cellular profile",
           onRefresh: () => {
             void refreshCellularState(true);
           },
