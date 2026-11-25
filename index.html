@@ -333,6 +333,40 @@
                 border-color: rgba(255, 168, 206, 0.72);
             }
 
+            /* Displayed workspace on a monitor without komorebi focus. */
+            .workspace-pill-active.workspace-pill-unfocused {
+                background: linear-gradient(
+                    135deg,
+                    rgba(255, 126, 182, 0.10) 0%,
+                    rgba(167, 155, 255, 0.06) 58%,
+                    rgba(92, 225, 255, 0.06) 100%
+                );
+                border-color: rgba(255, 126, 182, 0.26);
+                color: var(--text-secondary);
+                font-weight: 500;
+                box-shadow: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused .ws-index {
+                color: rgba(255, 168, 206, 0.72);
+                text-shadow: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused::after {
+                opacity: 0.35;
+                box-shadow: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused:hover {
+                background: linear-gradient(
+                    135deg,
+                    rgba(255, 126, 182, 0.20) 0%,
+                    rgba(92, 225, 255, 0.12) 100%
+                );
+                border-color: rgba(255, 168, 206, 0.48);
+                color: var(--text-primary);
+            }
+
             .interactive:hover {
                 background: var(--hover);
                 border-color: rgba(92, 225, 255, 0.24);
@@ -1953,6 +1987,14 @@
                 )
                     ? komorebiOutput.currentMonitor.focusedWorkspaceIndex
                     : -1;
+                // Whether this bar's monitor holds komorebi's global focus
+                // (monitors.focused). Unknown focus counts as focused.
+                const isMonitorFocused =
+                    !komorebiOutput?.focusedMonitor ||
+                    isSameKomorebiMonitor(
+                        komorebiOutput.currentMonitor,
+                        komorebiOutput.focusedMonitor,
+                    );
 
                 return workspaces.map((workspace, index) => {
                     const hasTilingWindows = Array.isArray(
@@ -1975,6 +2017,7 @@
                         index,
                         label: getKomorebiWorkspaceLabel(workspace, index),
                         isActive: index === activeIndex,
+                        isFocused: index === activeIndex && isMonitorFocused,
                         hasWindows:
                             hasTilingWindows ||
                             hasFloatingWindows ||
@@ -3942,6 +3985,10 @@ if ($response -eq [IntPtr]::Zero) {
 
                     if (item.isActive) {
                         button.classList.add("workspace-pill-active");
+
+                        if (!item.isFocused) {
+                            button.classList.add("workspace-pill-unfocused");
+                        }
                     }
 
                     if (item.hasWindows) {
