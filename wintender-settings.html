@@ -9,14 +9,26 @@
         <title>Wintender Settings</title>
         <style>
             :root {
-                --panel-bg: rgba(20, 20, 25, 0.9);
-                --panel-border: rgba(255, 255, 255, 0.08);
-                --panel-muted: #9a9aa4;
-                --panel-text: #e0e0e0;
-                --panel-accent: #89b4fa;
-                --panel-hover: rgba(255, 255, 255, 0.08);
-                --panel-input: rgba(255, 255, 255, 0.06);
-                --panel-preview: rgba(255, 255, 255, 0.04);
+                --panel-bg: linear-gradient(
+                    165deg,
+                    rgba(16, 28, 54, 0.78) 0%,
+                    rgba(7, 13, 28, 0.72) 100%
+                );
+                --acrylic-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+                --panel-border: rgba(255, 255, 255, 0.11);
+                --panel-border-gradient: linear-gradient(
+                    135deg,
+                    rgba(255, 126, 182, 0.58) 0%,
+                    rgba(255, 255, 255, 0.22) 45%,
+                    rgba(92, 225, 255, 0.52) 100%
+                );
+                --panel-muted: #9ab0d9;
+                --panel-text: #eaf0ff;
+                --panel-accent: #ff7eb6;
+                --panel-cyan: #5ce1ff;
+                --panel-hover: rgba(92, 225, 255, 0.16);
+                --panel-input: rgba(10, 18, 36, 0.68);
+                --panel-preview: rgba(22, 36, 68, 0.48);
             }
 
             * {
@@ -34,20 +46,22 @@
 
             body {
                 font-family:
-                    "JetBrainsMonohangul NF Regular", "JetBrainsMono Nerd Font",
-                    "CaskaydiaCove Nerd Font", "Segoe UI", monospace;
+                    "Pretendard Variable", "Pretendard",
+                    "Segoe UI Variable Text", "Segoe UI", sans-serif;
                 font-size: 13px;
                 color: var(--panel-text);
                 background: transparent;
+                -webkit-font-smoothing: antialiased;
             }
 
             .shell {
                 height: 100%;
-                padding: 10px;
+                padding: 6px;
                 overflow: hidden;
             }
 
             .panel {
+                position: relative;
                 display: flex;
                 flex-direction: column;
                 gap: 18px;
@@ -55,22 +69,42 @@
                 overflow-y: auto;
                 overflow-x: hidden;
                 padding: 18px;
-                border: 1px solid var(--panel-border);
-                border-radius: 18px;
-                background: var(--panel-bg);
-                backdrop-filter: blur(20px);
-                -webkit-backdrop-filter: blur(20px);
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+                border-radius: 16px;
+                background-image: var(--acrylic-noise), var(--panel-bg);
+                backdrop-filter: blur(28px) saturate(180%);
+                -webkit-backdrop-filter: blur(28px) saturate(180%);
+                box-shadow:
+                    0 22px 48px rgba(2, 5, 14, 0.62),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+            }
+
+            .panel::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                padding: 1px;
+                background: var(--panel-border-gradient);
+                -webkit-mask:
+                    linear-gradient(#fff 0 0) content-box,
+                    linear-gradient(#fff 0 0);
+                -webkit-mask-composite: xor;
+                mask-composite: exclude;
+                pointer-events: none;
             }
 
             .panel::-webkit-scrollbar {
-                width: 10px;
+                width: 8px;
             }
 
             .panel::-webkit-scrollbar-thumb {
                 border: 2px solid transparent;
                 border-radius: 999px;
-                background: rgba(255, 255, 255, 0.18);
+                background: linear-gradient(
+                    180deg,
+                    rgba(255, 126, 182, 0.45),
+                    rgba(92, 225, 255, 0.40)
+                );
                 background-clip: padding-box;
             }
 
@@ -81,12 +115,15 @@
             }
 
             .title {
-                font-size: 18px;
+                font-size: 17px;
                 font-weight: 700;
+                letter-spacing: 0.01em;
+                color: #f4f7ff;
             }
 
             .subtitle {
                 color: var(--panel-muted);
+                font-size: 12.5px;
                 line-height: 1.5;
             }
 
@@ -97,16 +134,16 @@
             }
 
             .section-label {
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 700;
-                letter-spacing: 0.06em;
+                letter-spacing: 0.08em;
                 text-transform: uppercase;
-                color: var(--panel-muted);
+                color: var(--panel-cyan);
             }
 
             .setting-list {
                 display: grid;
-                gap: 10px;
+                gap: 9px;
             }
 
             .setting-row {
@@ -118,12 +155,13 @@
                 border: 1px solid var(--panel-border);
                 border-radius: 12px;
                 background: var(--panel-preview);
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
             }
 
             .setting-copy {
                 display: flex;
                 flex-direction: column;
-                gap: 4px;
+                gap: 3px;
             }
 
             .setting-title {
@@ -132,6 +170,7 @@
 
             .setting-description {
                 color: var(--panel-muted);
+                font-size: 12px;
                 line-height: 1.4;
             }
 
@@ -141,8 +180,8 @@
                 justify-content: flex-start;
                 position: relative;
                 flex: 0 0 auto;
-                width: 52px;
-                height: 30px;
+                width: 46px;
+                height: 26px;
                 cursor: pointer;
             }
 
@@ -159,7 +198,7 @@
                 height: 100%;
                 border: 1px solid var(--panel-border);
                 border-radius: 999px;
-                background: var(--panel-preview);
+                background: rgba(10, 17, 34, 0.86);
                 transition:
                     background 0.18s ease,
                     border-color 0.18s ease,
@@ -170,12 +209,12 @@
                 position: absolute;
                 top: 4px;
                 left: 4px;
-                width: 20px;
-                height: 20px;
+                width: 18px;
+                height: 18px;
                 border-radius: 50%;
-                background: #f3f5f8;
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+                background: #c8d4f2;
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
                 transition:
                     transform 0.18s ease,
                     background 0.18s ease,
@@ -183,22 +222,24 @@
             }
 
             .toggle:hover .toggle-track {
-                border-color: rgba(255, 255, 255, 0.12);
-                background: rgba(255, 255, 255, 0.06);
+                border-color: rgba(92, 225, 255, 0.42);
+                background: rgba(22, 34, 61, 0.9);
             }
 
             .toggle input:checked + .toggle-track {
-                background: var(--panel-accent);
+                background: linear-gradient(90deg, #ff7eb6, #ff99c7);
+                border-color: rgba(255, 168, 206, 0.8);
+                box-shadow: 0 0 12px rgba(255, 126, 182, 0.42);
             }
 
             .toggle input:focus-visible + .toggle-track {
-                box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+                box-shadow: 0 0 0 2px rgba(255, 126, 182, 0.35);
             }
 
             .toggle input:checked + .toggle-track + .toggle-thumb {
-                transform: translateX(22px);
-                background: #ffffff;
-                border-color: rgba(137, 180, 250, 0.18);
+                transform: translateX(20px);
+                background: #070d1a;
+                border-color: rgba(7, 13, 26, 0.4);
             }
 
             .field {
@@ -209,23 +250,28 @@
 
             .field input {
                 width: 100%;
-                height: 40px;
+                height: 38px;
                 padding: 0 12px;
                 border: 1px solid var(--panel-border);
                 border-radius: 10px;
                 background: var(--panel-input);
                 color: var(--panel-text);
-                font: inherit;
+                font-family: "JetBrainsMono Nerd Font", "Pretendard", monospace;
+                font-size: 12.5px;
                 outline: none;
+                transition:
+                    border-color 0.15s ease,
+                    box-shadow 0.15s ease;
             }
 
             .field input:focus {
-                border-color: rgba(137, 180, 250, 0.5);
-                box-shadow: 0 0 0 1px rgba(137, 180, 250, 0.24);
+                border-color: rgba(255, 126, 182, 0.65);
+                box-shadow: 0 0 0 2px rgba(255, 126, 182, 0.18);
             }
 
             .field-hint {
                 color: var(--panel-muted);
+                font-size: 12px;
                 line-height: 1.5;
             }
 
@@ -241,9 +287,14 @@
 
             .preview-value {
                 color: var(--panel-accent);
-                font-size: 15px;
+                font-family:
+                    "JetBrainsMono Nerd Font", "Pretendard Variable", monospace;
+                font-size: 14px;
                 font-weight: 600;
+                font-variant-numeric: tabular-nums;
+                letter-spacing: 0.02em;
                 line-height: 1.4;
+                text-shadow: 0 0 10px rgba(255, 126, 182, 0.35);
             }
 
             .token-list {
@@ -254,10 +305,12 @@
 
             .token {
                 padding: 4px 8px;
+                border: 1px solid rgba(92, 225, 255, 0.20);
                 border-radius: 999px;
-                background: var(--panel-hover);
-                color: var(--panel-muted);
-                font-size: 12px;
+                background: rgba(92, 225, 255, 0.08);
+                color: #9be5ff;
+                font-family: "JetBrainsMono Nerd Font", monospace;
+                font-size: 11.5px;
             }
 
             .chip-list {
@@ -304,12 +357,14 @@
 
             .chip-button:hover {
                 background: var(--panel-hover);
+                border-color: rgba(92, 225, 255, 0.42);
             }
 
             .chip-button-active {
-                background: var(--panel-accent);
+                background: linear-gradient(90deg, #ff7eb6, #ff99c7);
                 border-color: var(--panel-accent);
-                color: #11141b;
+                color: #070d1a;
+                font-weight: 600;
             }
 
             .chip-remove {
@@ -341,22 +396,25 @@
             }
 
             .action-button {
-                height: 40px;
+                height: 38px;
                 padding: 0 14px;
-                border: 1px solid var(--panel-border);
+                border: 1px solid rgba(255, 126, 182, 0.36);
                 border-radius: 10px;
-                background: var(--panel-preview);
-                color: var(--panel-text);
+                background: rgba(255, 126, 182, 0.14);
+                color: #ffffff;
                 font: inherit;
+                font-weight: 600;
                 cursor: pointer;
                 transition:
                     background 0.18s ease,
-                    border-color 0.18s ease;
+                    border-color 0.18s ease,
+                    box-shadow 0.18s ease;
             }
 
             .action-button:hover {
-                background: var(--panel-hover);
-                border-color: rgba(255, 255, 255, 0.12);
+                background: rgba(255, 126, 182, 0.24);
+                border-color: rgba(255, 168, 206, 0.65);
+                box-shadow: 0 0 12px rgba(255, 126, 182, 0.28);
             }
         </style>
     </head>

@@ -6,10 +6,20 @@
     <title>wintender Tray Popup</title>
     <style>
       :root {
-        --popup-bg: rgba(24, 24, 30, 0.94);
-        --text-primary: #e0e0e0;
-        --hover: rgba(255, 255, 255, 0.1);
-        --border: rgba(255, 255, 255, 0.06);
+        --popup-bg: linear-gradient(
+          165deg,
+          rgba(16, 28, 54, 0.78) 0%,
+          rgba(7, 13, 28, 0.72) 100%
+        );
+        --acrylic-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+        --text-primary: #eaf0ff;
+        --hover: rgba(92, 225, 255, 0.16);
+        --border-gradient: linear-gradient(
+          135deg,
+          rgba(255, 126, 182, 0.58) 0%,
+          rgba(255, 255, 255, 0.22) 45%,
+          rgba(92, 225, 255, 0.52) 100%
+        );
       }
 
       * {
@@ -27,17 +37,18 @@
 
       body {
         font-family:
-          "JetBrainsMonohangul NF Regular",
-          "JetBrainsMono Nerd Font",
-          "CaskaydiaCove Nerd Font",
+          "Pretendard Variable",
+          "Pretendard",
+          "Segoe UI Variable Text",
           "Segoe UI",
-          monospace;
+          sans-serif;
         color: var(--text-primary);
         user-select: none;
         background: transparent;
       }
 
       .popup {
+        position: relative;
         display: flex;
         align-content: flex-start;
         align-items: flex-start;
@@ -45,30 +56,49 @@
         gap: 6px;
         width: 100%;
         height: 100%;
-        padding: 6px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--popup-bg);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+        padding: 7px;
+        border-radius: 11px;
+        background-image: var(--acrylic-noise), var(--popup-bg);
+        backdrop-filter: blur(26px) saturate(180%);
+        -webkit-backdrop-filter: blur(26px) saturate(180%);
+        box-shadow:
+          0 18px 40px rgba(2, 5, 14, 0.62),
+          inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      }
+
+      .popup::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        padding: 1px;
+        background: var(--border-gradient);
+        -webkit-mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
       }
 
       .tray-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 22px;
-        height: 22px;
-        border: 0;
-        border-radius: 5px;
+        width: 24px;
+        height: 24px;
+        border: 1px solid transparent;
+        border-radius: 6px;
         background: transparent;
         cursor: pointer;
-        transition: background 0.15s ease;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
       }
 
       .tray-button:hover {
         background: var(--hover);
+        border-color: rgba(92, 225, 255, 0.32);
       }
 
       .tray-button img {
