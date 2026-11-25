@@ -731,7 +731,9 @@
             const MEDIA_TEXT_LIMIT = 28;
             const VOLUME_STEP = 5;
             const CELLULAR_SIGNAL_REFRESH_INTERVAL = 5000;
-            const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
+            // Provider changes trigger immediate polls, so the periodic poll is
+            // only a safety net.
+            const KOMOREBI_STATE_REFRESH_INTERVAL = 2500;
             const WEATHER_REFRESH_INTERVAL = 15 * 60 * 1000;
             const QUICK_SETTINGS_POPUP_WIDTH = 420;
             const QUICK_SETTINGS_POPUP_HEIGHT = 580;
