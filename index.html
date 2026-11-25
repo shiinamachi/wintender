@@ -811,6 +811,7 @@
                 komorebiRefreshRequest: null,
                 komorebiRefreshSequence: 0,
                 komorebiAppliedRefreshSequence: 0,
+                komorebiMonitorHint: "",
                 latestSystrayOutput: null,
                 latestIpOutput: null,
                 latestWeatherOutput: null,
@@ -1548,20 +1549,123 @@
                     .includes("program not found");
             }
 
+            // Returns the widget position in physical pixels (komorebi's
+            // coordinate space). window.screenX/Y are logical pixels, so the
+            // fallback scales them by devicePixelRatio.
             function getCurrentWidgetScreenPosition(options = {}) {
                 const fallbackWindow =
                     typeof window === "object" && window ? window : null;
+                const scale =
+                    Number.isFinite(fallbackWindow?.devicePixelRatio) &&
+                    fallbackWindow.devicePixelRatio > 0
+                        ? fallbackWindow.devicePixelRatio
+                        : 1;
                 const x = Number.isFinite(options.x)
                     ? options.x
-                    : fallbackWindow?.screenX;
+                    : fallbackWindow?.screenX * scale;
                 const y = Number.isFinite(options.y)
                     ? options.y
-                    : fallbackWindow?.screenY;
+                    : fallbackWindow?.screenY * scale;
 
                 return {
                     x: Number.isFinite(x) ? x : 0,
                     y: Number.isFinite(y) ? y : 0,
                 };
+            }
+
+            // Physical outer position of this widget window via Tauri, or
+            // null when it is unavailable (the caller then falls back to the
+            // DPI-corrected window.screenX/Y).
+            async function getWidgetPhysicalPosition() {
+                try {
+                    const tauriWindow = zebar.currentWidget()?.tauriWindow;
+                    const position = await tauriWindow?.outerPosition?.();
+
+                    if (
+                        Number.isFinite(position?.x) &&
+                        Number.isFinite(position?.y)
+                    ) {
+                        return { x: position.x, y: position.y };
+                    }
+                } catch (error) {
+                    // fall back to window.screenX/Y
+                }
+
+                return null;
+            }
+
+            function isSameKomorebiMonitor(monitorA, monitorB) {
+                if (!monitorA || !monitorB) {
+                    return false;
+                }
+
+                if (monitorA === monitorB) {
+                    return true;
+                }
+
+                if (normalizeText(monitorA.deviceId)) {
+                    return monitorA.deviceId === monitorB.deviceId;
+                }
+
+                return (
+                    Number.isFinite(monitorA.id) &&
+                    monitorA.id >= 0 &&
+                    monitorA.id === monitorB.id
+                );
+            }
+
+            // Picks the komorebi monitor this bar sits on: the device ID hint
+            // from the Zebar komorebi provider first, then the monitor whose
+            // rect contains the widget position, then the nearest work area.
+            function pickCurrentKomorebiMonitor(allMonitors, options = {}) {
+                const hint = normalizeText(options.monitorHint);
+
+                if (hint) {
+                    const hinted = allMonitors.find(
+                        (monitor) => monitor.deviceId === hint,
+                    );
+
+                    if (hinted) {
+                        return hinted;
+                    }
+                }
+
+                const position = getCurrentWidgetScreenPosition(options);
+                // komorebi rects store width/height in right/bottom.
+                const containing = allMonitors.find((monitor) => {
+                    const rect = monitor.size ?? monitor.workAreaSize;
+
+                    if (!rect) {
+                        return false;
+                    }
+
+                    const left = rect.left ?? 0;
+                    const top = rect.top ?? 0;
+
+                    return (
+                        position.x >= left &&
+                        position.x < left + (rect.right ?? 0) &&
+                        position.y >= top &&
+                        position.y < top + (rect.bottom ?? 0)
+                    );
+                });
+
+                if (containing) {
+                    return containing;
+                }
+
+                return allMonitors.reduce((closest, candidate) =>
+                    getCoordinateDistance(position, {
+                        x: candidate.workAreaSize?.left ?? 0,
+                        y: candidate.workAreaSize?.top ?? 0,
+                    }) <
+                    getCoordinateDistance(position, {
+                        x: closest.workAreaSize?.left ?? 0,
+                        y: closest.workAreaSize?.top ?? 0,
+                    })
+                        ? candidate
+                        : closest,
+                );
             }
 
             function normalizeKomorebiWindow(rawWindow) {
@@ -1736,19 +1840,9 @@
                 )
                     ? parsed.monitors.focused
                     : 0;
-                const currentPosition =
-                    getCurrentWidgetScreenPosition(options);
-                const currentMonitor = allMonitors.reduce((closest, candidate) =>
-                    getCoordinateDistance(currentPosition, {
-                        x: candidate.workAreaSize?.left ?? 0,
-                        y: candidate.workAreaSize?.top ?? 0,
-                    }) <
-                    getCoordinateDistance(currentPosition, {
-                        x: closest.workAreaSize?.left ?? 0,
-                        y: closest.workAreaSize?.top ?? 0,
-                    })
-                        ? candidate
-                        : closest,
+                const currentMonitor = pickCurrentKomorebiMonitor(
+                    allMonitors,
+                    options,
                 );
                 const focusedMonitor =
                     allMonitors[focusedMonitorIndex] ?? allMonitors[0];
@@ -3673,9 +3767,16 @@ if ($response -eq [IntPtr]::Zero) {
                 const refreshSequence = ++state.komorebiRefreshSequence;
                 const request = (async () => {
                     try {
-                        const result = await runKomorebicCommand("state");
+                        const [result, widgetPosition] = await Promise.all([
+                            runKomorebicCommand("state"),
+                            getWidgetPhysicalPosition(),
+                        ]);
                         const komorebiOutput = parseKomorebiStateOutput(
                             result.stdout,
+                            {
+                                ...(widgetPosition ?? {}),
+                                monitorHint: state.komorebiMonitorHint,
+                            },
                         );
 
                         if (!komorebiOutput) {
