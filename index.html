@@ -812,6 +812,10 @@
                 komorebiRefreshSequence: 0,
                 komorebiAppliedRefreshSequence: 0,
                 komorebiMonitorHint: "",
+                komorebiRefreshQueued: false,
+                lastProviderKomorebiOutput: null,
+                lastProviderKomorebiOutputAt: 0,
+                komorebiProviderErrored: false,
                 latestSystrayOutput: null,
                 latestIpOutput: null,
                 latestWeatherOutput: null,
@@ -3780,6 +3784,7 @@ if ($response -eq [IntPtr]::Zero) {
                         );
 
                         if (!komorebiOutput) {
+                            handleKomorebiPollFailure(refreshSequence);
                             return;
                         }
 
@@ -3796,15 +3801,100 @@ if ($response -eq [IntPtr]::Zero) {
                         renderKomorebi(komorebiOutput);
                     } catch (error) {
                         console.error("Failed to refresh komorebi state", error);
+                        handleKomorebiPollFailure(refreshSequence);
                     } finally {
                         if (state.komorebiRefreshRequest === request) {
                             state.komorebiRefreshRequest = null;
+
+                            if (state.komorebiRefreshQueued) {
+                                state.komorebiRefreshQueued = false;
+                                void refreshKomorebiState({ force: true });
+                            }
                         }
                     }
                 })();
 
                 state.komorebiRefreshRequest = request;
                 return request;
+            }
+
+            // Runs a `komorebic state` poll now. While one is in flight, a
+            // burst of provider events is coalesced into a single follow-up
+            // poll instead of spawning komorebic for every event.
+            function requestKomorebiRefresh() {
+                if (state.komorebiRefreshRequest) {
+                    state.komorebiRefreshQueued = true;
+                    return state.komorebiRefreshRequest;
+                }
+
+                return refreshKomorebiState({ force: true });
+            }
+
+            // The `komorebic state` poll is the only rendered source. The
+            // Zebar komorebi provider snapshot is used only when polling
+            // fails, the snapshot is newer than the last successful poll and
+            // no newer poll has been applied.
+            function handleKomorebiPollFailure(refreshSequence) {
+                if (refreshSequence < state.komorebiAppliedRefreshSequence) {
+                    return;
+                }
+
+                if (state.komorebiProviderErrored) {
+                    // Both sources failed: komorebi is most likely not running.
+                    state.komorebiAppliedRefreshSequence = refreshSequence;
+                    state.latestKomorebiOutput = null;
+                    renderKomorebi(null);
+                    return;
+                }
+
+                const providerOutput = state.lastProviderKomorebiOutput;
+
+                if (
+                    !providerOutput ||
+                    state.lastProviderKomorebiOutputAt <=
+                        state.komorebiLastRefreshAt
+                ) {
+                    return;
+                }
+
+                state.komorebiAppliedRefreshSequence = refreshSequence;
+                state.latestKomorebiOutput = providerOutput;
+                renderKomorebi(providerOutput);
+            }
+
+            // Zebar calls onOutput with the whole output map whenever any
+            // provider emits, so only a new komorebi snapshot reference means
+            // komorebi changed. It is used as a trigger (and monitor hint) for
+            // an immediate poll, never rendered over poll results.
+            function handleKomorebiProviderOutput(providerOutput) {
+                if (
+                    !providerOutput ||
+                    providerOutput === state.lastProviderKomorebiOutput
+                ) {
+                    return;
+                }
+
+                state.lastProviderKomorebiOutput = providerOutput;
+                state.lastProviderKomorebiOutputAt = Date.now();
+                state.komorebiProviderErrored = false;
+
+                const monitorHint = normalizeText(
+                    providerOutput.currentMonitor?.deviceId,
+                );
+
+                if (monitorHint) {
+                    state.komorebiMonitorHint = monitorHint;
+                }
+
+                // Until the first poll lands, show the provider snapshot.
+                if (
+                    state.komorebiAppliedRefreshSequence === 0 &&
+                    !state.latestKomorebiOutput
+                ) {
+                    state.latestKomorebiOutput = providerOutput;
+                }
+
+                void requestKomorebiRefresh();
             }
 
             function syncLeftDivider() {
@@ -4161,9 +4251,7 @@ if ($response -eq [IntPtr]::Zero) {
             } else {
                 setupUserSettingsSync();
                 providers.onOutput((output) => {
-                    if (output.komorebi) {
-                        state.latestKomorebiOutput = output.komorebi;
-                    }
+                    handleKomorebiProviderOutput(output.komorebi);
 
                     state.latestDateOutput = output.date;
                     state.latestMediaOutput = output.media;
@@ -4181,9 +4269,11 @@ if ($response -eq [IntPtr]::Zero) {
 
                 providers.onError((errorMap) => {
                     if (errorMap?.komorebi) {
-                        state.latestKomorebiOutput = null;
-                        renderKomorebi(null);
-                        void refreshKomorebiState();
+                        // Keep the poll result; clear only if the poll fails
+                        // too (see handleKomorebiPollFailure).
+                        state.komorebiProviderErrored = true;
+                        state.lastProviderKomorebiOutput = null;
+                        void requestKomorebiRefresh();
                     }
 
                     console.error("Zebar provider error", errorMap);
