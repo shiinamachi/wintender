@@ -818,6 +818,7 @@
                 latestAudioOutput: null,
                 latestBatteryOutput: null,
                 cellularSignalStrength: null,
+                cellularProviderName: null,
                 cellularSignalUpdatedAt: 0,
                 cellularSignalRequest: null,
                 weatherProviderGroup: null,
@@ -1354,13 +1355,111 @@
                 );
             }
 
-            function parseNetshCellularSignalStrength(output) {
-                if (typeof output !== "string") {
-                    return null;
+            // netsh writes in the console code page (CP949 on ko-KR), so the
+            // output is requested raw and decoded here: strict UTF-8 first,
+            // then EUC-KR (CP949), then lossy UTF-8.
+            function decodeShellOutputText(output) {
+                if (typeof output === "string") {
+                    return output;
                 }
 
-                const match = output.match(/^\s*Signal\s*:\s*(\d+)%\s*$/im);
-                return match ? clamp(Number(match[1]), 0, 100) : null;
+                let bytes = null;
+
+                if (output instanceof Uint8Array) {
+                    bytes = output;
+                } else if (Array.isArray(output)) {
+                    bytes = Uint8Array.from(output);
+                } else if (output instanceof ArrayBuffer) {
+                    bytes = new Uint8Array(output);
+                }
+
+                if (!bytes) {
+                    return "";
+                }
+
+                for (const [label, fatal] of [
+                    ["utf-8", true],
+                    ["euc-kr", true],
+                    ["utf-8", false],
+                ]) {
+                    try {
+                        return new TextDecoder(label, { fatal }).decode(bytes);
+                    } catch {
+                        // try the next encoding
+                    }
+                }
+
+                return "";
+            }
+
+            // Splits `netsh mbn show interfaces` output into one block per
+            // interface and returns the connected one first.
+            function getNetshCellularInterfaceBlocks(output) {
+                if (typeof output !== "string" || !output.trim()) {
+                    return [];
+                }
+
+                const blocks = [];
+                let current = null;
+
+                output.split(/\r?\n/).forEach((line) => {
+                    if (/^\s*(?:Name|이름)\s*:/i.test(line) || !current) {
+                        current = [];
+                        blocks.push(current);
+                    }
+
+                    current.push(line);
+                });
+
+                const texts = blocks
+                    .map((lines) => lines.join("\n"))
+                    .filter((text) => text.trim());
+                const isConnected = (text) => {
+                    const match = text.match(
+                        /^\s*(?:State|상태)\s*:\s*(.+?)\s*$/im,
+                    );
+                    return match
+                        ? /^(?:connected|연결\s*됨)$/i.test(match[1])
+                        : false;
+                };
+
+                return [
+                    ...texts.filter(isConnected),
+                    ...texts.filter((text) => !isConnected(text)),
+                ];
+            }
+
+            function parseNetshCellularSignalStrength(output) {
+                for (const block of getNetshCellularInterfaceBlocks(output)) {
+                    const match =
+                        block.match(
+                            /^\s*(?:Signal|신호)\s*:\s*(\d+)%\s*$/im,
+                        ) ??
+                        // Label-agnostic fallback (mis-decoded labels): the
+                        // only `: NN%` line in the block is the signal.
+                        block.match(/^[^:\r\n]*:\s*(\d{1,3})%\s*$/m);
+
+                    if (match) {
+                        return clamp(Number(match[1]), 0, 100);
+                    }
+                }
+
+                return null;
+            }
+
+            function parseNetshCellularProvider(output) {
+                for (const block of getNetshCellularInterfaceBlocks(output)) {
+                    const match = block.match(
+                        /^\s*(?:Provider Name|공급자 이름)\s*:\s*(.+?)\s*$/im,
+                    );
+                    const name = normalizeText(match?.[1]);
+
+                    if (name) {
+                        return name;
+                    }
+                }
+
+                return null;
             }
 
             function getMediaState(mediaOutput) {
@@ -1869,6 +1968,7 @@
 
                 if (isCellularInterfaceType(defaultInterface.type)) {
                     const text =
+                        normalizeText(options.cellularProviderName) ||
                         normalizeText(defaultInterface.friendlyName) ||
                         normalizeText(defaultInterface.description) ||
                         normalizeText(defaultInterface.name) ||
@@ -1905,21 +2005,15 @@
                     return false;
                 }
 
-                const providerSignal = getSignalStrengthValue(
-                    defaultInterface.signalStrength,
-                    defaultInterface.signalPercent,
-                    defaultInterface.strength,
-                    defaultInterface.signal,
-                    defaultInterface.quality,
-                );
-
-                if (providerSignal !== null || state.cellularSignalRequest) {
+                if (state.cellularSignalRequest) {
                     return false;
                 }
 
+                // netsh is polled even when the provider reports a signal
+                // strength, because it is the only source of the carrier name.
                 const elapsed = Date.now() - state.cellularSignalUpdatedAt;
                 return (
-                    state.cellularSignalStrength === null ||
+                    state.cellularSignalUpdatedAt === 0 ||
                     elapsed >= CELLULAR_SIGNAL_REFRESH_INTERVAL
                 );
             }
@@ -1934,11 +2028,22 @@
                         const result = await zebar.shellExec(
                             "netsh.exe",
                             "mbn show interfaces",
+                            { encoding: "raw" },
                         );
+                        const stdout = decodeShellOutputText(result.stdout);
                         const signalStrength =
-                            parseNetshCellularSignalStrength(result.stdout);
+                            parseNetshCellularSignalStrength(stdout);
+                        const providerName =
+                            parseNetshCellularProvider(stdout);
 
                         state.cellularSignalStrength = signalStrength;
+
+                        // Keep the last known carrier name when a poll
+                        // misses it so the label does not flicker.
+                        if (providerName) {
+                            state.cellularProviderName = providerName;
+                        }
+
                         state.cellularSignalUpdatedAt = Date.now();
                     } catch (error) {
                         state.cellularSignalUpdatedAt = Date.now();
@@ -3790,6 +3895,7 @@ if ($response -eq [IntPtr]::Zero) {
 
                 const networkState = getNetworkState(networkOutput, {
                     cellularSignalStrength: state.cellularSignalStrength,
+                    cellularProviderName: state.cellularProviderName,
                 });
                 clearElement(elements.network);
                 elements.network.onclick = null;
