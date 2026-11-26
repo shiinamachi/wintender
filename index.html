@@ -4,7 +4,716 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>wintender Top Bar</title>
-        <style>
+        <style data-wintender-theme="sakura-night">
+            :root {
+                --void: #070d1a;
+                --surface: #0f182d;
+                --elevated: #16223d;
+                --overlay: #1f2f52;
+                --bar-bg: linear-gradient(
+                    165deg,
+                    rgba(18, 30, 56, 0.64) 0%,
+                    rgba(8, 15, 32, 0.54) 100%
+                );
+                --popup-bg: linear-gradient(
+                    165deg,
+                    rgba(16, 27, 52, 0.80) 0%,
+                    rgba(7, 13, 28, 0.74) 100%
+                );
+                --acrylic-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+                --text-primary: #eaf0ff;
+                --text-secondary: #9ab0d9;
+                --text-muted: #768ab5;
+                --accent: #ff7eb6;
+                --accent-bright: #ffa8ce;
+                --accent-soft: rgba(255, 126, 182, 0.20);
+                --cyan: #5ce1ff;
+                --cyan-soft: rgba(92, 225, 255, 0.16);
+                --iris: #a79bff;
+                --lantern: #ffc46b;
+                --mint: #6ce8b5;
+                --warning: #ff5c7a;
+                --hover: rgba(92, 225, 255, 0.15);
+                --border: rgba(255, 126, 182, 0.28);
+                --border-gradient: linear-gradient(
+                    125deg,
+                    rgba(255, 126, 182, 0.56) 0%,
+                    rgba(255, 255, 255, 0.20) 45%,
+                    rgba(92, 225, 255, 0.52) 100%
+                );
+                --glass-highlight:
+                    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                    inset 0 -1px 0 rgba(92, 225, 255, 0.08);
+                --island-shadow:
+                    0 8px 24px rgba(2, 6, 16, 0.46),
+                    var(--glass-highlight);
+                --popup-shadow:
+                    0 18px 42px rgba(2, 5, 14, 0.62),
+                    var(--glass-highlight);
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                min-height: 38px;
+                overflow: hidden;
+                background: transparent;
+            }
+
+            body {
+                position: relative;
+                font-family:
+                    "Pretendard Variable", "Pretendard",
+                    "Segoe UI Variable Text", "Segoe UI",
+                    "JetBrainsMono Nerd Font", sans-serif;
+                font-size: 12.5px;
+                color: var(--text-primary);
+                user-select: none;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            .bar {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                align-items: center;
+                gap: 10px;
+                height: 38px;
+                width: 100%;
+                padding: 5px 10px 1px;
+                background: transparent;
+            }
+
+            .section {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                min-width: 0;
+                max-width: 100%;
+                height: 32px;
+                padding: 0 7px;
+                gap: 4px;
+                border-radius: 10px;
+                background-image: var(--acrylic-noise), var(--bar-bg);
+                backdrop-filter: blur(24px) saturate(175%);
+                -webkit-backdrop-filter: blur(24px) saturate(175%);
+                box-shadow: var(--island-shadow);
+            }
+
+            .section::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                padding: 1px;
+                background: var(--border-gradient);
+                -webkit-mask:
+                    linear-gradient(#fff 0 0) content-box,
+                    linear-gradient(#fff 0 0);
+                -webkit-mask-composite: xor;
+                mask-composite: exclude;
+                pointer-events: none;
+            }
+
+            .section-left {
+                justify-self: start;
+                justify-content: flex-start;
+                overflow: hidden;
+            }
+
+            .section-center {
+                justify-self: center;
+                justify-content: center;
+                padding: 0 12px;
+            }
+
+            .section-right {
+                justify-self: end;
+                justify-content: flex-end;
+                overflow: hidden;
+                padding: 0 6px;
+            }
+
+            .island-divider {
+                flex: 0 0 auto;
+                width: 1px;
+                height: 14px;
+                margin: 0 3px;
+                background: linear-gradient(
+                    180deg,
+                    transparent 0%,
+                    rgba(255, 126, 182, 0.42) 45%,
+                    rgba(92, 225, 255, 0.34) 100%
+                );
+            }
+
+            .media-pill {
+                flex: 0 1 210px;
+                min-width: 0;
+                overflow: hidden;
+            }
+
+            .media-pill .status-icon {
+                color: var(--accent);
+                text-shadow: 0 0 8px rgba(255, 126, 182, 0.5);
+            }
+
+            .left-status-item,
+            .right-status-item {
+                flex: 0 0 auto;
+            }
+
+            .tray {
+                display: flex;
+                align-items: center;
+                min-width: 0;
+                gap: 4px;
+            }
+
+            .workspaces {
+                display: flex;
+                align-items: center;
+                min-width: 0;
+                gap: 3px;
+                overflow: hidden;
+            }
+
+            .pill {
+                display: inline-flex;
+                align-items: center;
+                min-width: 0;
+                gap: 5px;
+                height: 24px;
+                padding: 0 8px;
+                border: 1px solid transparent;
+                border-radius: 7px;
+                color: var(--text-primary);
+                white-space: nowrap;
+                transition:
+                    background 0.16s ease,
+                    border-color 0.16s ease,
+                    color 0.16s ease,
+                    box-shadow 0.16s ease;
+            }
+
+            .interactive {
+                cursor: pointer;
+            }
+
+            .muted {
+                color: var(--text-secondary);
+            }
+
+            .power-pill {
+                width: 24px;
+                height: 24px;
+                padding: 0;
+                justify-content: center;
+                color: var(--accent-bright);
+            }
+
+            .power-pill:hover,
+            .power-pill.interactive-active {
+                background: rgba(255, 126, 182, 0.18);
+                border-color: rgba(255, 126, 182, 0.42);
+                color: #ffffff;
+                box-shadow: 0 0 10px rgba(255, 126, 182, 0.28);
+            }
+
+            .workspace-text {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .media-text {
+                flex: 1 1 auto;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                color: #d6e0fa;
+                font-size: 12px;
+            }
+
+            .workspace-pill {
+                position: relative;
+                max-width: 104px;
+                padding: 0 8px;
+                gap: 4px;
+                border: 1px solid transparent;
+                background: transparent;
+                color: var(--text-secondary);
+                font-family:
+                    "JetBrainsMono Nerd Font", "Pretendard", "Segoe UI",
+                    monospace;
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            .workspace-pill .ws-index {
+                font-family:
+                    "JetBrainsMono Nerd Font", "Pretendard Variable", monospace;
+                font-size: 11px;
+                font-weight: 700;
+                font-variant-numeric: tabular-nums;
+                color: var(--text-muted);
+                line-height: 1;
+                transition: color 0.16s ease, text-shadow 0.16s ease;
+            }
+
+            .workspace-pill .ws-label {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .workspace-pill-occupied {
+                color: #cdd9f8;
+            }
+
+            .workspace-pill-occupied .ws-index {
+                color: rgba(92, 225, 255, 0.85);
+            }
+
+            .workspace-pill:hover {
+                background: var(--cyan-soft);
+                border-color: rgba(92, 225, 255, 0.30);
+                color: var(--text-primary);
+            }
+
+            .workspace-pill:hover .ws-index {
+                color: var(--cyan);
+            }
+
+            .workspace-pill-active {
+                background: linear-gradient(
+                    135deg,
+                    rgba(255, 126, 182, 0.26) 0%,
+                    rgba(167, 155, 255, 0.15) 58%,
+                    rgba(92, 225, 255, 0.16) 100%
+                );
+                border-color: rgba(255, 126, 182, 0.56);
+                color: #ffffff;
+                font-weight: 600;
+                box-shadow:
+                    0 0 12px rgba(255, 126, 182, 0.22),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+            }
+
+            .workspace-pill-active .ws-index {
+                color: var(--accent-bright);
+                text-shadow: 0 0 8px rgba(255, 126, 182, 0.78);
+            }
+
+            .workspace-pill-active::after {
+                content: "";
+                position: absolute;
+                left: 7px;
+                right: 7px;
+                bottom: -1px;
+                height: 2px;
+                border-radius: 2px;
+                background: linear-gradient(90deg, var(--accent), var(--cyan));
+                box-shadow: 0 0 8px rgba(255, 126, 182, 0.85);
+            }
+
+            .workspace-pill-active:hover {
+                background: linear-gradient(
+                    135deg,
+                    rgba(255, 126, 182, 0.34) 0%,
+                    rgba(92, 225, 255, 0.20) 100%
+                );
+                border-color: rgba(255, 168, 206, 0.72);
+            }
+
+            /* Displayed workspace on a monitor without komorebi focus. */
+            .workspace-pill-active.workspace-pill-unfocused {
+                background: linear-gradient(
+                    135deg,
+                    rgba(255, 126, 182, 0.10) 0%,
+                    rgba(167, 155, 255, 0.06) 58%,
+                    rgba(92, 225, 255, 0.06) 100%
+                );
+                border-color: rgba(255, 126, 182, 0.26);
+                color: var(--text-secondary);
+                font-weight: 500;
+                box-shadow: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused .ws-index {
+                color: rgba(255, 168, 206, 0.72);
+                text-shadow: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused::after {
+                opacity: 0.35;
+                box-shadow: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused:hover {
+                background: linear-gradient(
+                    135deg,
+                    rgba(255, 126, 182, 0.20) 0%,
+                    rgba(92, 225, 255, 0.12) 100%
+                );
+                border-color: rgba(255, 168, 206, 0.48);
+                color: var(--text-primary);
+            }
+
+            .interactive:hover {
+                background: var(--hover);
+                border-color: rgba(92, 225, 255, 0.24);
+            }
+
+            .interactive-active {
+                background: var(--accent-soft);
+                border-color: rgba(255, 126, 182, 0.42);
+            }
+
+            .datetime {
+                min-width: 0;
+                padding: 0 2px;
+                gap: 7px;
+            }
+
+            .clock-orb {
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                flex: 0 0 auto;
+                background: var(--accent);
+                box-shadow:
+                    0 0 8px rgba(255, 126, 182, 0.9),
+                    0 0 2px #ffffff;
+            }
+
+            .clock-date {
+                font-family:
+                    "Pretendard Variable", "Pretendard",
+                    "Segoe UI Variable Text", "Segoe UI", sans-serif;
+                font-size: 12px;
+                font-weight: 500;
+                color: #b4c2e3;
+                letter-spacing: 0.01em;
+            }
+
+            .clock-sep {
+                width: 1px;
+                height: 13px;
+                flex: 0 0 auto;
+                background: linear-gradient(
+                    180deg,
+                    transparent 0%,
+                    rgba(255, 126, 182, 0.65) 35%,
+                    rgba(92, 225, 255, 0.72) 68%,
+                    transparent 100%
+                );
+            }
+
+            .clock-time {
+                font-family:
+                    "JetBrainsMono Nerd Font", "Pretendard Variable",
+                    "Segoe UI Variable Text", monospace;
+                font-size: 12.5px;
+                font-weight: 600;
+                font-variant-numeric: tabular-nums;
+                letter-spacing: 0.03em;
+                color: #f4f7ff;
+                text-shadow: 0 0 10px rgba(92, 225, 255, 0.34);
+            }
+
+            .status-icon {
+                flex: 0 0 auto;
+                font-family:
+                    "JetBrainsMono Nerd Font", "CaskaydiaCove Nerd Font",
+                    monospace;
+                font-size: 14px;
+                line-height: 1;
+            }
+
+            .weather-pill {
+                color: #dce6ff;
+                font-size: 12px;
+            }
+
+            .weather-pill .status-icon {
+                color: var(--cyan);
+            }
+
+            .weather-pill.weather-warm .status-icon {
+                color: var(--lantern);
+                text-shadow: 0 0 8px rgba(255, 196, 107, 0.45);
+            }
+
+            .network-pill {
+                color: #dce6ff;
+                font-size: 12px;
+            }
+
+            .network-pill .status-icon {
+                color: var(--cyan);
+                text-shadow: 0 0 8px rgba(92, 225, 255, 0.38);
+            }
+
+            .network-pill.network-offline .status-icon {
+                color: var(--warning);
+                text-shadow: none;
+            }
+
+            .audio-pill {
+                color: #dce6ff;
+                font-family: "JetBrainsMono Nerd Font", "Pretendard", monospace;
+                font-size: 12px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .audio-pill .status-icon {
+                color: var(--iris);
+            }
+
+            .audio-pill.audio-muted {
+                color: var(--text-secondary);
+            }
+
+            .audio-pill.audio-muted .status-icon {
+                color: var(--warning);
+            }
+
+            .battery-pill {
+                color: #eaf0ff;
+                font-family: "JetBrainsMono Nerd Font", "Pretendard", monospace;
+                font-size: 12px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .battery-pill .status-icon {
+                color: var(--mint);
+                text-shadow: 0 0 8px rgba(108, 232, 181, 0.35);
+            }
+
+            .battery-pill.battery-charging .status-icon {
+                color: var(--lantern);
+                text-shadow: 0 0 9px rgba(255, 196, 107, 0.55);
+            }
+
+            .battery-pill.battery-low .status-icon {
+                color: var(--lantern);
+            }
+
+            .battery-pill.warning {
+                color: var(--warning);
+                background: rgba(255, 92, 122, 0.14);
+                border-color: rgba(255, 92, 122, 0.42);
+            }
+
+            .battery-pill.warning .status-icon {
+                color: var(--warning);
+                text-shadow: 0 0 8px rgba(255, 92, 122, 0.6);
+            }
+
+            .tray {
+                position: relative;
+                padding: 0 2px;
+            }
+
+            .tray-overflow {
+                position: relative;
+            }
+
+            .tray-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 22px;
+                height: 22px;
+                border: 1px solid transparent;
+                border-radius: 6px;
+                background: transparent;
+                cursor: pointer;
+                transition:
+                    background 0.15s ease,
+                    border-color 0.15s ease;
+            }
+
+            .tray-button:hover {
+                background: var(--hover);
+                border-color: rgba(92, 225, 255, 0.25);
+            }
+
+            .tray-button img {
+                width: 15px;
+                height: 15px;
+            }
+
+            .tray-more {
+                width: auto;
+                min-width: 28px;
+                height: 22px;
+                padding: 0 7px;
+                border: 1px solid rgba(92, 225, 255, 0.24);
+                border-radius: 6px;
+                background: rgba(92, 225, 255, 0.09);
+                color: #8ee4ff;
+                font-family: "JetBrainsMono Nerd Font", monospace;
+                font-size: 11px;
+                font-weight: 600;
+            }
+
+            .tray-more:hover {
+                background: rgba(92, 225, 255, 0.18);
+                border-color: rgba(92, 225, 255, 0.45);
+                color: #ffffff;
+            }
+
+            .tray-popover {
+                position: absolute;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-height: 32px;
+                padding: 6px;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                background: var(--popup-bg);
+                backdrop-filter: blur(20px) saturate(145%);
+                -webkit-backdrop-filter: blur(20px) saturate(145%);
+                box-shadow: var(--popup-shadow);
+                z-index: 10;
+            }
+
+            .top-bar-context-menu,
+            .power-menu {
+                position: absolute;
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+                min-width: 186px;
+                padding: 6px;
+                border-radius: 12px;
+                background-image: var(--acrylic-noise), var(--popup-bg);
+                backdrop-filter: blur(26px) saturate(175%);
+                -webkit-backdrop-filter: blur(26px) saturate(175%);
+                box-shadow: var(--popup-shadow);
+                z-index: 20;
+            }
+
+            .top-bar-context-menu::before,
+            .power-menu::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                padding: 1px;
+                background: var(--border-gradient);
+                -webkit-mask:
+                    linear-gradient(#fff 0 0) content-box,
+                    linear-gradient(#fff 0 0);
+                -webkit-mask-composite: xor;
+                mask-composite: exclude;
+                pointer-events: none;
+            }
+
+            .top-bar-context-menu-item,
+            .power-menu-item {
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                width: 100%;
+                min-height: 31px;
+                padding: 0 10px;
+                border: 1px solid transparent;
+                border-radius: 8px;
+                background: transparent;
+                color: var(--text-primary);
+                font: inherit;
+                text-align: left;
+                cursor: pointer;
+                transition:
+                    background 0.15s ease,
+                    border-color 0.15s ease,
+                    color 0.15s ease;
+            }
+
+            .top-bar-context-menu-item .status-icon,
+            .power-menu-item .status-icon {
+                color: var(--cyan);
+                transition: color 0.15s ease;
+            }
+
+            .top-bar-context-menu-item:hover,
+            .power-menu-item:hover {
+                background: rgba(92, 225, 255, 0.13);
+                border-color: rgba(92, 225, 255, 0.28);
+                color: #ffffff;
+            }
+
+            .top-bar-context-menu-item:hover .status-icon,
+            .power-menu-item:hover .status-icon {
+                color: var(--accent-bright);
+            }
+
+            #power .status-icon {
+                font-size: 14px;
+            }
+
+            .power-menu {
+                left: 10px;
+                top: 44px;
+            }
+
+            .power-menu-item-danger .status-icon {
+                color: rgba(255, 92, 122, 0.85);
+            }
+
+            .power-menu-item-danger:hover {
+                background: rgba(255, 92, 122, 0.16);
+                border-color: rgba(255, 92, 122, 0.36);
+                color: #ff9eb0;
+            }
+
+            .power-menu-item-danger:hover .status-icon {
+                color: var(--warning);
+            }
+
+            .power-menu-separator {
+                height: 1px;
+                margin: 4px 8px;
+                background: linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255, 126, 182, 0.32),
+                    rgba(92, 225, 255, 0.28),
+                    transparent
+                );
+            }
+
+            .power-menu-status {
+                margin: 2px 4px 0;
+                padding: 6px 8px 0;
+                border-top: 1px solid var(--border);
+                color: var(--warning);
+                font-size: 11px;
+                line-height: 1.4;
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
+
+            .warning {
+                color: var(--warning);
+            }
+
+            .hidden {
+                display: none !important;
+            }
+        </style>
+        <style data-wintender-theme="legacy" media="not all">
             :root {
                 --bar-bg: rgba(20, 20, 25, 0.82);
                 --text-primary: #e0e0e0;
@@ -318,12 +1027,32 @@
             .hidden {
                 display: none !important;
             }
+
+            /* Added with the theme option: follow the docked window height
+               and keep newer elements consistent with the original look. */
+            body {
+                min-height: var(--top-bar-height, 32px);
+            }
+
+            .bar {
+                height: var(--top-bar-height, 32px);
+            }
+
+            .island-divider {
+                display: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused {
+                background: rgba(137, 180, 250, 0.08);
+                color: var(--text-secondary);
+            }
         </style>
+        <script src="./resources/theme.js"></script>
     </head>
     <body>
         <div class="bar">
             <div class="section section-left">
-                <div id="power" class="pill interactive left-status-item"
+                <div id="power" class="pill power-pill interactive left-status-item"
                     role="button"
                     aria-haspopup="menu"
                     aria-expanded="false"
@@ -331,6 +1060,7 @@
                 >
                     <span class="status-icon">󰐥</span>
                 </div>
+                <span id="left-divider" class="island-divider hidden"></span>
                 <div id="workspaces" class="workspaces hidden"></div>
             </div>
             <div class="section section-center">
@@ -339,18 +1069,18 @@
             <div class="section section-right">
                 <div id="media" class="pill media-pill hidden"></div>
                 <div id="systray" class="tray right-status-item hidden"></div>
-                <div id="weather" class="pill right-status-item hidden"></div>
+                <div id="weather" class="pill weather-pill right-status-item hidden"></div>
                 <div
                     id="network"
-                    class="pill interactive right-status-item hidden"
+                    class="pill network-pill interactive right-status-item hidden"
                 ></div>
                 <div
                     id="audio"
-                    class="pill interactive right-status-item hidden"
+                    class="pill audio-pill interactive right-status-item hidden"
                 ></div>
                 <div
                     id="battery"
-                    class="pill interactive right-status-item hidden"
+                    class="pill battery-pill interactive right-status-item hidden"
                 ></div>
             </div>
         </div>
@@ -370,22 +1100,47 @@
             const MEDIA_TEXT_LIMIT = 28;
             const VOLUME_STEP = 5;
             const CELLULAR_SIGNAL_REFRESH_INTERVAL = 5000;
-            const KOMOREBI_STATE_REFRESH_INTERVAL = 1000;
+            // Provider changes trigger immediate polls, so the periodic poll is
+            // only a safety net.
+            const KOMOREBI_STATE_REFRESH_INTERVAL = 2500;
             const WEATHER_REFRESH_INTERVAL = 15 * 60 * 1000;
             const QUICK_SETTINGS_POPUP_WIDTH = 420;
             const QUICK_SETTINGS_POPUP_HEIGHT = 580;
             const WINTENDER_SETTINGS_WIDTH = 420;
-            const WINTENDER_SETTINGS_HEIGHT = 420;
+            const WINTENDER_SETTINGS_HEIGHT = 460;
             const POWERSHELL_BASE_ARGS = [
                 "-NoProfile",
                 "-NonInteractive",
                 "-WindowStyle",
                 "Hidden",
             ];
-            const TOP_BAR_HEIGHT = 32;
-            const TOP_BAR_CONTEXT_MENU_WIDTH = 172;
+            const DEFAULT_THEME = "sakura-night";
+            // Sizes that differ per theme. Menu widths match each theme's CSS.
+            const THEME_METRICS = Object.freeze({
+                "sakura-night": Object.freeze({
+                    topBarHeight: 38,
+                    contextMenuWidth: 186,
+                    powerMenuWidth: 186,
+                    popupMinOffsetY: 44,
+                    settingsOffsetX: "-10px",
+                    settingsOffsetY: "44px",
+                }),
+                legacy: Object.freeze({
+                    topBarHeight: 32,
+                    contextMenuWidth: 172,
+                    powerMenuWidth: 180,
+                    popupMinOffsetY: 36,
+                    settingsOffsetX: "0px",
+                    settingsOffsetY: "40px",
+                }),
+            });
+            // Zebar reserves the docked area from the preset the bar starts
+            // with ("default" is 38px, "legacy" is 32px), so the closed bar keeps
+            // that height. It is read once, before any menu enlarges the window.
+            const DOCKED_WINDOW_HEIGHT = Math.round(
+                Number(globalThis.innerHeight) || 0,
+            );
             const TOP_BAR_CONTEXT_MENU_MARGIN = 8;
-            const POWER_MENU_WIDTH = 180;
             const POWER_MENU_MARGIN = 8;
             const POWER_AVAILABILITY_CACHE_DURATION_MS = 30000;
             const ZEBAR_SETTINGS_WINDOW_TIMEOUT_MS = 1500;
@@ -413,12 +1168,14 @@
                 showBattery: true,
                 clockFormat: "",
                 pinnedTrayApps: [],
+                theme: DEFAULT_THEME,
             });
             const CLOCK_TOKEN_PATTERN =
                 /yyyy|dddd|ddd|yy|MM|M|dd|d|HH|H|hh|h|mm|m|ss|s|tt/g;
 
             const elements = {
                 workspaces: document.getElementById("workspaces"),
+                leftDivider: document.getElementById("left-divider"),
                 datetime: document.getElementById("datetime"),
                 media: document.getElementById("media"),
                 systray: document.getElementById("systray"),
@@ -449,6 +1206,11 @@
                 komorebiRefreshRequest: null,
                 komorebiRefreshSequence: 0,
                 komorebiAppliedRefreshSequence: 0,
+                komorebiMonitorHint: "",
+                komorebiRefreshQueued: false,
+                lastProviderKomorebiOutput: null,
+                lastProviderKomorebiOutputAt: 0,
+                komorebiProviderErrored: false,
                 latestSystrayOutput: null,
                 latestIpOutput: null,
                 latestWeatherOutput: null,
@@ -456,6 +1218,7 @@
                 latestAudioOutput: null,
                 latestBatteryOutput: null,
                 cellularSignalStrength: null,
+                cellularProviderName: null,
                 cellularSignalUpdatedAt: 0,
                 cellularSignalRequest: null,
                 weatherProviderGroup: null,
@@ -646,7 +1409,36 @@
                     );
                 }
 
+                if (Object.hasOwn(THEME_METRICS, rawSettings.theme)) {
+                    settings.theme = rawSettings.theme;
+                }
+
                 return settings;
+            }
+
+            function isLegacyTheme() {
+                return state.userSettings.theme === "legacy";
+            }
+
+            function getThemeMetrics() {
+                return (
+                    THEME_METRICS[state.userSettings.theme] ??
+                    THEME_METRICS[DEFAULT_THEME]
+                );
+            }
+
+            function getTopBarHeight() {
+                return DOCKED_WINDOW_HEIGHT >= 24 && DOCKED_WINDOW_HEIGHT <= 64
+                    ? DOCKED_WINDOW_HEIGHT
+                    : getThemeMetrics().topBarHeight;
+            }
+
+            function applyTheme() {
+                globalThis.wintenderTheme?.applyTheme?.(state.userSettings.theme);
+                document.documentElement.style.setProperty(
+                    "--top-bar-height",
+                    `${getTopBarHeight()}px`,
+                );
             }
 
             function safeJsonParse(text) {
@@ -833,6 +1625,11 @@
                     previousSettings,
                     nextSettings: state.userSettings,
                 });
+                applyTheme();
+
+                if (previousSettings.theme !== state.userSettings.theme) {
+                    void syncTopBarOverlaySize();
+                }
 
                 if (rerender) {
                     renderAllCurrentState();
@@ -992,13 +1789,129 @@
                 );
             }
 
-            function parseNetshCellularSignalStrength(output) {
-                if (typeof output !== "string") {
-                    return null;
+            // Runs a command and returns its stdout as text, requesting raw bytes so
+            // decodeShellOutputText can handle CP949. Falls back to Zebar's default
+            // UTF-8 decoding if the raw encoding option is rejected.
+            async function shellExecText(program, args) {
+                let result;
+
+                try {
+                    result = await zebar.shellExec(program, args, {
+                        encoding: "raw",
+                    });
+                } catch (error) {
+                    console.warn("Raw shell output failed; retrying as UTF-8", error);
+                    result = await zebar.shellExec(program, args);
                 }
 
-                const match = output.match(/^\s*Signal\s*:\s*(\d+)%\s*$/im);
-                return match ? clamp(Number(match[1]), 0, 100) : null;
+                return decodeShellOutputText(result?.stdout);
+            }
+
+            // netsh writes in the console code page (CP949 on ko-KR), so the
+            // output is requested raw and decoded here: strict UTF-8 first,
+            // then EUC-KR (CP949), then lossy UTF-8.
+            function decodeShellOutputText(output) {
+                if (typeof output === "string") {
+                    return output;
+                }
+
+                let bytes = null;
+
+                if (output instanceof Uint8Array) {
+                    bytes = output;
+                } else if (Array.isArray(output)) {
+                    bytes = Uint8Array.from(output);
+                } else if (output instanceof ArrayBuffer) {
+                    bytes = new Uint8Array(output);
+                }
+
+                if (!bytes) {
+                    return "";
+                }
+
+                for (const [label, fatal] of [
+                    ["utf-8", true],
+                    ["euc-kr", true],
+                    ["utf-8", false],
+                ]) {
+                    try {
+                        return new TextDecoder(label, { fatal }).decode(bytes);
+                    } catch {
+                        // try the next encoding
+                    }
+                }
+
+                return "";
+            }
+
+            // Splits `netsh mbn show interfaces` output into one block per
+            // interface and returns the connected one first.
+            function getNetshCellularInterfaceBlocks(output) {
+                if (typeof output !== "string" || !output.trim()) {
+                    return [];
+                }
+
+                const blocks = [];
+                let current = null;
+
+                output.split(/\r?\n/).forEach((line) => {
+                    if (/^\s*(?:Name|이름)\s*:/i.test(line) || !current) {
+                        current = [];
+                        blocks.push(current);
+                    }
+
+                    current.push(line);
+                });
+
+                const texts = blocks
+                    .map((lines) => lines.join("\n"))
+                    .filter((text) => text.trim());
+                const isConnected = (text) => {
+                    const match = text.match(
+                        /^\s*(?:State|상태)\s*:\s*(.+?)\s*$/im,
+                    );
+                    return match
+                        ? /^(?:connected|연결\s*됨)$/i.test(match[1])
+                        : false;
+                };
+
+                return [
+                    ...texts.filter(isConnected),
+                    ...texts.filter((text) => !isConnected(text)),
+                ];
+            }
+
+            function parseNetshCellularSignalStrength(output) {
+                for (const block of getNetshCellularInterfaceBlocks(output)) {
+                    const match =
+                        block.match(
+                            /^\s*(?:Signal|신호)\s*:\s*(\d+)%\s*$/im,
+                        ) ??
+                        // Label-agnostic fallback (mis-decoded labels): the
+                        // only `: NN%` line in the block is the signal.
+                        block.match(/^[^:\r\n]*:\s*(\d{1,3})%\s*$/m);
+
+                    if (match) {
+                        return clamp(Number(match[1]), 0, 100);
+                    }
+                }
+
+                return null;
+            }
+
+            function parseNetshCellularProvider(output) {
+                for (const block of getNetshCellularInterfaceBlocks(output)) {
+                    const match = block.match(
+                        /^\s*(?:Provider Name|공급자 이름)\s*:\s*(.+?)\s*$/im,
+                    );
+                    const name = normalizeText(match?.[1]);
+
+                    if (name) {
+                        return name;
+                    }
+                }
+
+                return null;
             }
 
             function getMediaState(mediaOutput) {
@@ -1087,20 +2000,123 @@
                     .includes("program not found");
             }
 
+            // Returns the widget position in physical pixels (komorebi's
+            // coordinate space). window.screenX/Y are logical pixels, so the
+            // fallback scales them by devicePixelRatio.
             function getCurrentWidgetScreenPosition(options = {}) {
                 const fallbackWindow =
                     typeof window === "object" && window ? window : null;
+                const scale =
+                    Number.isFinite(fallbackWindow?.devicePixelRatio) &&
+                    fallbackWindow.devicePixelRatio > 0
+                        ? fallbackWindow.devicePixelRatio
+                        : 1;
                 const x = Number.isFinite(options.x)
                     ? options.x
-                    : fallbackWindow?.screenX;
+                    : fallbackWindow?.screenX * scale;
                 const y = Number.isFinite(options.y)
                     ? options.y
-                    : fallbackWindow?.screenY;
+                    : fallbackWindow?.screenY * scale;
 
                 return {
                     x: Number.isFinite(x) ? x : 0,
                     y: Number.isFinite(y) ? y : 0,
                 };
+            }
+
+            // Physical outer position of this widget window via Tauri, or
+            // null when it is unavailable (the caller then falls back to the
+            // DPI-corrected window.screenX/Y).
+            async function getWidgetPhysicalPosition() {
+                try {
+                    const tauriWindow = zebar.currentWidget()?.tauriWindow;
+                    const position = await tauriWindow?.outerPosition?.();
+
+                    if (
+                        Number.isFinite(position?.x) &&
+                        Number.isFinite(position?.y)
+                    ) {
+                        return { x: position.x, y: position.y };
+                    }
+                } catch (error) {
+                    // fall back to window.screenX/Y
+                }
+
+                return null;
+            }
+
+            function isSameKomorebiMonitor(monitorA, monitorB) {
+                if (!monitorA || !monitorB) {
+                    return false;
+                }
+
+                if (monitorA === monitorB) {
+                    return true;
+                }
+
+                if (normalizeText(monitorA.deviceId)) {
+                    return monitorA.deviceId === monitorB.deviceId;
+                }
+
+                return (
+                    Number.isFinite(monitorA.id) &&
+                    monitorA.id >= 0 &&
+                    monitorA.id === monitorB.id
+                );
+            }
+
+            // Picks the komorebi monitor this bar sits on: the device ID hint
+            // from the Zebar komorebi provider first, then the monitor whose
+            // rect contains the widget position, then the nearest work area.
+            function pickCurrentKomorebiMonitor(allMonitors, options = {}) {
+                const hint = normalizeText(options.monitorHint);
+
+                if (hint) {
+                    const hinted = allMonitors.find(
+                        (monitor) => monitor.deviceId === hint,
+                    );
+
+                    if (hinted) {
+                        return hinted;
+                    }
+                }
+
+                const position = getCurrentWidgetScreenPosition(options);
+                // komorebi rects store width/height in right/bottom.
+                const containing = allMonitors.find((monitor) => {
+                    const rect = monitor.size ?? monitor.workAreaSize;
+
+                    if (!rect) {
+                        return false;
+                    }
+
+                    const left = rect.left ?? 0;
+                    const top = rect.top ?? 0;
+
+                    return (
+                        position.x >= left &&
+                        position.x < left + (rect.right ?? 0) &&
+                        position.y >= top &&
+                        position.y < top + (rect.bottom ?? 0)
+                    );
+                });
+
+                if (containing) {
+                    return containing;
+                }
+
+                return allMonitors.reduce((closest, candidate) =>
+                    getCoordinateDistance(position, {
+                        x: candidate.workAreaSize?.left ?? 0,
+                        y: candidate.workAreaSize?.top ?? 0,
+                    }) <
+                    getCoordinateDistance(position, {
+                        x: closest.workAreaSize?.left ?? 0,
+                        y: closest.workAreaSize?.top ?? 0,
+                    })
+                        ? candidate
+                        : closest,
+                );
             }
 
             function normalizeKomorebiWindow(rawWindow) {
@@ -1275,19 +2291,9 @@
                 )
                     ? parsed.monitors.focused
                     : 0;
-                const currentPosition =
-                    getCurrentWidgetScreenPosition(options);
-                const currentMonitor = allMonitors.reduce((closest, candidate) =>
-                    getCoordinateDistance(currentPosition, {
-                        x: candidate.workAreaSize?.left ?? 0,
-                        y: candidate.workAreaSize?.top ?? 0,
-                    }) <
-                    getCoordinateDistance(currentPosition, {
-                        x: closest.workAreaSize?.left ?? 0,
-                        y: closest.workAreaSize?.top ?? 0,
-                    })
-                        ? candidate
-                        : closest,
+                const currentMonitor = pickCurrentKomorebiMonitor(
+                    allMonitors,
+                    options,
                 );
                 const focusedMonitor =
                     allMonitors[focusedMonitorIndex] ?? allMonitors[0];
@@ -1392,12 +2398,44 @@
                 )
                     ? komorebiOutput.currentMonitor.focusedWorkspaceIndex
                     : -1;
+                // Whether this bar's monitor holds komorebi's global focus
+                // (monitors.focused). Unknown focus counts as focused.
+                const isMonitorFocused =
+                    !komorebiOutput?.focusedMonitor ||
+                    isSameKomorebiMonitor(
+                        komorebiOutput.currentMonitor,
+                        komorebiOutput.focusedMonitor,
+                    );
 
-                return workspaces.map((workspace, index) => ({
-                    index,
-                    label: getKomorebiWorkspaceLabel(workspace, index),
-                    isActive: index === activeIndex,
-                }));
+                return workspaces.map((workspace, index) => {
+                    const hasTilingWindows = Array.isArray(
+                        workspace?.tilingContainers,
+                    )
+                        ? workspace.tilingContainers.some(
+                              (container) =>
+                                  Array.isArray(container?.windows) &&
+                                  container.windows.length > 0,
+                          )
+                        : false;
+                    const hasFloatingWindows =
+                        Array.isArray(workspace?.floatingWindows) &&
+                        workspace.floatingWindows.length > 0;
+                    const hasMonocleWindows =
+                        Array.isArray(workspace?.monocleContainer?.windows) &&
+                        workspace.monocleContainer.windows.length > 0;
+
+                    return {
+                        index,
+                        label: getKomorebiWorkspaceLabel(workspace, index),
+                        isActive: index === activeIndex,
+                        isFocused: index === activeIndex && isMonitorFocused,
+                        hasWindows:
+                            hasTilingWindows ||
+                            hasFloatingWindows ||
+                            hasMonocleWindows ||
+                            Boolean(workspace?.maximizedWindow),
+                    };
+                });
             }
 
             function getKomorebiFocusWorkspaceCommand(
@@ -1484,6 +2522,7 @@
 
                 if (isCellularInterfaceType(defaultInterface.type)) {
                     const text =
+                        normalizeText(options.cellularProviderName) ||
                         normalizeText(defaultInterface.friendlyName) ||
                         normalizeText(defaultInterface.description) ||
                         normalizeText(defaultInterface.name) ||
@@ -1520,21 +2559,15 @@
                     return false;
                 }
 
-                const providerSignal = getSignalStrengthValue(
-                    defaultInterface.signalStrength,
-                    defaultInterface.signalPercent,
-                    defaultInterface.strength,
-                    defaultInterface.signal,
-                    defaultInterface.quality,
-                );
-
-                if (providerSignal !== null || state.cellularSignalRequest) {
+                if (state.cellularSignalRequest) {
                     return false;
                 }
 
+                // netsh is polled even when the provider reports a signal
+                // strength, because it is the only source of the carrier name.
                 const elapsed = Date.now() - state.cellularSignalUpdatedAt;
                 return (
-                    state.cellularSignalStrength === null ||
+                    state.cellularSignalUpdatedAt === 0 ||
                     elapsed >= CELLULAR_SIGNAL_REFRESH_INTERVAL
                 );
             }
@@ -1546,14 +2579,23 @@
 
                 state.cellularSignalRequest = (async () => {
                     try {
-                        const result = await zebar.shellExec(
+                        const stdout = await shellExecText(
                             "netsh.exe",
                             "mbn show interfaces",
                         );
                         const signalStrength =
-                            parseNetshCellularSignalStrength(result.stdout);
+                            parseNetshCellularSignalStrength(stdout);
+                        const providerName =
+                            parseNetshCellularProvider(stdout);
 
                         state.cellularSignalStrength = signalStrength;
+
+                        // Keep the last known carrier name when a poll
+                        // misses it so the label does not flicker.
+                        if (providerName) {
+                            state.cellularProviderName = providerName;
+                        }
+
                         state.cellularSignalUpdatedAt = Date.now();
                     } catch (error) {
                         state.cellularSignalUpdatedAt = Date.now();
@@ -1704,7 +2746,10 @@
                 return {
                     icon,
                     text: `${percent}%`,
-                    isWarning: !batteryOutput.isCharging && percent < 10,
+                    percent,
+                    isCharging: Boolean(batteryOutput.isCharging),
+                    isLow: !batteryOutput.isCharging && percent < 30 && percent >= 15,
+                    isWarning: !batteryOutput.isCharging && percent < 15,
                 };
             }
 
@@ -1911,7 +2956,10 @@
                     8,
                     Math.round(anchorRect.right - popupWidth),
                 );
-                const offsetY = Math.max(36, Math.round(anchorRect.bottom + 8));
+                const offsetY = Math.max(
+                    getThemeMetrics().popupMinOffsetY,
+                    Math.round(anchorRect.bottom + 8),
+                );
 
                 try {
                     await zebar.startWidget(
@@ -1949,7 +2997,10 @@
                     8,
                     Math.round(anchorRect.right - popupWidth),
                 );
-                const offsetY = Math.max(36, Math.round(anchorRect.bottom + 8));
+                const offsetY = Math.max(
+                    getThemeMetrics().popupMinOffsetY,
+                    Math.round(anchorRect.bottom + 8),
+                );
 
                 return {
                     anchor: "top_left",
@@ -2506,12 +3557,12 @@ if ($response -eq [IntPtr]::Zero) {
                     Number.isFinite(window?.innerWidth) &&
                     window.innerWidth > 0
                         ? window.innerWidth
-                        : TOP_BAR_CONTEXT_MENU_WIDTH +
+                        : getThemeMetrics().contextMenuWidth +
                           TOP_BAR_CONTEXT_MENU_MARGIN * 2;
                 const maxLeft = Math.max(
                     TOP_BAR_CONTEXT_MENU_MARGIN,
                     viewportWidth -
-                        TOP_BAR_CONTEXT_MENU_WIDTH -
+                        getThemeMetrics().contextMenuWidth -
                         TOP_BAR_CONTEXT_MENU_MARGIN,
                 );
 
@@ -2522,7 +3573,7 @@ if ($response -eq [IntPtr]::Zero) {
                         maxLeft,
                     ),
                     top: Math.max(
-                        TOP_BAR_HEIGHT + 6,
+                        getTopBarHeight() + 6,
                         Math.round(clientY),
                     ),
                 };
@@ -2541,12 +3592,12 @@ if ($response -eq [IntPtr]::Zero) {
                 const menuWidth =
                     Number.isFinite(menuRect?.width) && menuRect.width > 0
                         ? Math.ceil(menuRect.width)
-                        : POWER_MENU_WIDTH;
+                        : getThemeMetrics().powerMenuWidth;
                 const viewportWidth =
                     Number.isFinite(window?.innerWidth) &&
                     window.innerWidth > 0
                         ? window.innerWidth
-                        : POWER_MENU_WIDTH + POWER_MENU_MARGIN * 2;
+                        : getThemeMetrics().powerMenuWidth + POWER_MENU_MARGIN * 2;
                 const maxLeft = Math.max(
                     POWER_MENU_MARGIN,
                     viewportWidth - menuWidth - POWER_MENU_MARGIN,
@@ -2556,11 +3607,11 @@ if ($response -eq [IntPtr]::Zero) {
                     : POWER_MENU_MARGIN;
                 const buttonBottom = Number.isFinite(buttonRect?.bottom)
                     ? Math.round(buttonRect.bottom)
-                    : TOP_BAR_HEIGHT;
+                    : getTopBarHeight();
 
                 return {
                     left: clamp(buttonLeft, POWER_MENU_MARGIN, maxLeft),
-                    top: Math.max(TOP_BAR_HEIGHT + 6, buttonBottom + 6),
+                    top: Math.max(getTopBarHeight() + 6, buttonBottom + 6),
                 };
             }
 
@@ -2593,15 +3644,15 @@ if ($response -eq [IntPtr]::Zero) {
                 }
 
                 if (menu === elements.powerMenu) {
-                    return POWER_MENU_WIDTH + POWER_MENU_MARGIN * 2;
+                    return getThemeMetrics().powerMenuWidth + POWER_MENU_MARGIN * 2;
                 }
 
-                return TOP_BAR_CONTEXT_MENU_WIDTH + TOP_BAR_CONTEXT_MENU_MARGIN * 2;
+                return getThemeMetrics().contextMenuWidth + TOP_BAR_CONTEXT_MENU_MARGIN * 2;
             }
 
             function getTopBarOverlayHeight(menu) {
                 if (!menu) {
-                    return TOP_BAR_HEIGHT;
+                    return getTopBarHeight();
                 }
 
                 const rect =
@@ -2620,7 +3671,7 @@ if ($response -eq [IntPtr]::Zero) {
                         : TOP_BAR_CONTEXT_MENU_MARGIN;
 
                 return (
-                    TOP_BAR_HEIGHT +
+                    getTopBarHeight() +
                     (measuredHeight ?? fallbackHeight) +
                     menuMargin * 2
                 );
@@ -2852,8 +3903,8 @@ if ($response -eq [IntPtr]::Zero) {
             function getWintenderSettingsPlacement() {
                 return {
                     anchor: "top_right",
-                    offsetX: "0px",
-                    offsetY: "40px",
+                    offsetX: getThemeMetrics().settingsOffsetX,
+                    offsetY: getThemeMetrics().settingsOffsetY,
                     width: `${WINTENDER_SETTINGS_WIDTH}px`,
                     height: `${WINTENDER_SETTINGS_HEIGHT}px`,
                     monitorSelection: { type: "primary" },
@@ -3088,8 +4139,54 @@ if ($response -eq [IntPtr]::Zero) {
                 return button;
             }
 
+            function splitClockDisplay(formatted) {
+                const text = normalizeText(formatted);
+
+                if (!text || text === "--") {
+                    return { datePart: "", timePart: text || "--" };
+                }
+
+                const match = text.match(
+                    /^(.*?)\s+((?:오전|오후|AM|PM)\s+\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)$/i,
+                );
+
+                if (!match) {
+                    return { datePart: "", timePart: text };
+                }
+
+                return {
+                    datePart: normalizeText(match[1]),
+                    timePart: normalizeText(match[2]),
+                };
+            }
+
             function renderDate(dateOutput) {
-                elements.datetime.textContent = formatDate(dateOutput?.now);
+                const formatted = formatDate(dateOutput?.now);
+
+                if (isLegacyTheme()) {
+                    elements.datetime.textContent = formatted;
+                    return;
+                }
+
+                const { datePart, timePart } = splitClockDisplay(formatted);
+                clearElement(elements.datetime);
+
+                const orb = document.createElement("span");
+                orb.className = "clock-orb";
+                elements.datetime.appendChild(orb);
+
+                if (datePart) {
+                    elements.datetime.appendChild(
+                        textSpan("clock-date", datePart),
+                    );
+                    const sep = document.createElement("span");
+                    sep.className = "clock-sep";
+                    elements.datetime.appendChild(sep);
+                }
+
+                elements.datetime.appendChild(
+                    textSpan("clock-time", timePart),
+                );
             }
 
             function renderMedia(mediaOutput) {
@@ -3140,12 +4237,20 @@ if ($response -eq [IntPtr]::Zero) {
                 const refreshSequence = ++state.komorebiRefreshSequence;
                 const request = (async () => {
                     try {
-                        const result = await runKomorebicCommand("state");
+                        const [result, widgetPosition] = await Promise.all([
+                            runKomorebicCommand("state"),
+                            getWidgetPhysicalPosition(),
+                        ]);
                         const komorebiOutput = parseKomorebiStateOutput(
                             result.stdout,
+                            {
+                                ...(widgetPosition ?? {}),
+                                monitorHint: state.komorebiMonitorHint,
+                            },
                         );
 
                         if (!komorebiOutput) {
+                            handleKomorebiPollFailure(refreshSequence);
                             return;
                         }
 
@@ -3162,9 +4267,15 @@ if ($response -eq [IntPtr]::Zero) {
                         renderKomorebi(komorebiOutput);
                     } catch (error) {
                         console.error("Failed to refresh komorebi state", error);
+                        handleKomorebiPollFailure(refreshSequence);
                     } finally {
                         if (state.komorebiRefreshRequest === request) {
                             state.komorebiRefreshRequest = null;
+
+                            if (state.komorebiRefreshQueued) {
+                                state.komorebiRefreshQueued = false;
+                                void refreshKomorebiState({ force: true });
+                            }
                         }
                     }
                 })();
@@ -3173,11 +4284,104 @@ if ($response -eq [IntPtr]::Zero) {
                 return request;
             }
 
+            // Runs a `komorebic state` poll now. While one is in flight, a
+            // burst of provider events is coalesced into a single follow-up
+            // poll instead of spawning komorebic for every event.
+            function requestKomorebiRefresh() {
+                if (state.komorebiRefreshRequest) {
+                    state.komorebiRefreshQueued = true;
+                    return state.komorebiRefreshRequest;
+                }
+
+                return refreshKomorebiState({ force: true });
+            }
+
+            // The `komorebic state` poll is the only rendered source. The
+            // Zebar komorebi provider snapshot is used only when polling
+            // fails, the snapshot is newer than the last successful poll and
+            // no newer poll has been applied.
+            function handleKomorebiPollFailure(refreshSequence) {
+                if (refreshSequence < state.komorebiAppliedRefreshSequence) {
+                    return;
+                }
+
+                if (state.komorebiProviderErrored) {
+                    // Both sources failed: komorebi is most likely not running.
+                    state.komorebiAppliedRefreshSequence = refreshSequence;
+                    state.latestKomorebiOutput = null;
+                    renderKomorebi(null);
+                    return;
+                }
+
+                const providerOutput = state.lastProviderKomorebiOutput;
+
+                if (
+                    !providerOutput ||
+                    state.lastProviderKomorebiOutputAt <=
+                        state.komorebiLastRefreshAt
+                ) {
+                    return;
+                }
+
+                state.komorebiAppliedRefreshSequence = refreshSequence;
+                state.latestKomorebiOutput = providerOutput;
+                renderKomorebi(providerOutput);
+            }
+
+            // Zebar calls onOutput with the whole output map whenever any
+            // provider emits, so only a new komorebi snapshot reference means
+            // komorebi changed. It is used as a trigger (and monitor hint) for
+            // an immediate poll, never rendered over poll results.
+            function handleKomorebiProviderOutput(providerOutput) {
+                if (
+                    !providerOutput ||
+                    providerOutput === state.lastProviderKomorebiOutput
+                ) {
+                    return;
+                }
+
+                state.lastProviderKomorebiOutput = providerOutput;
+                state.lastProviderKomorebiOutputAt = Date.now();
+                state.komorebiProviderErrored = false;
+
+                const monitorHint = normalizeText(
+                    providerOutput.currentMonitor?.deviceId,
+                );
+
+                if (monitorHint) {
+                    state.komorebiMonitorHint = monitorHint;
+                }
+
+                // Until the first poll lands, show the provider snapshot.
+                if (
+                    state.komorebiAppliedRefreshSequence === 0 &&
+                    !state.latestKomorebiOutput
+                ) {
+                    state.latestKomorebiOutput = providerOutput;
+                }
+
+                void requestKomorebiRefresh();
+            }
+
+            function syncLeftDivider() {
+                if (!elements.leftDivider) {
+                    return;
+                }
+
+                const powerVisible =
+                    elements.power && !elements.power.classList.contains("hidden");
+                const wsVisible =
+                    elements.workspaces &&
+                    !elements.workspaces.classList.contains("hidden");
+                toggleHidden(elements.leftDivider, !(powerVisible && wsVisible));
+            }
+
             function renderKomorebi(komorebiOutput) {
                 clearElement(elements.workspaces);
 
                 if (!state.userSettings.showKomorebiWorkspaces) {
                     toggleHidden(elements.workspaces, true);
+                    syncLeftDivider();
                     return;
                 }
 
@@ -3185,6 +4389,7 @@ if ($response -eq [IntPtr]::Zero) {
 
                 if (!items.length) {
                     toggleHidden(elements.workspaces, true);
+                    syncLeftDivider();
                     return;
                 }
 
@@ -3201,11 +4406,29 @@ if ($response -eq [IntPtr]::Zero) {
 
                     if (item.isActive) {
                         button.classList.add("workspace-pill-active");
+
+                        if (!item.isFocused) {
+                            button.classList.add("workspace-pill-unfocused");
+                        }
                     }
 
-                    button.appendChild(
-                        textSpan("workspace-text", item.label),
-                    );
+                    if (item.hasWindows) {
+                        button.classList.add("workspace-pill-occupied");
+                    }
+
+                    const labelMatch = isLegacyTheme()
+                        ? null
+                        : String(item.label).match(/^(\d+)[-:\s]+(.+)$/);
+
+                    if (labelMatch) {
+                        button.appendChild(textSpan("ws-index", labelMatch[1]));
+                        button.appendChild(textSpan("ws-label", labelMatch[2]));
+                    } else {
+                        button.appendChild(
+                            textSpan("workspace-text", item.label),
+                        );
+                    }
+
                     button.addEventListener("click", () => {
                         void focusKomorebiWorkspace(command);
                     });
@@ -3213,6 +4436,7 @@ if ($response -eq [IntPtr]::Zero) {
                 });
 
                 toggleHidden(elements.workspaces, false);
+                syncLeftDivider();
             }
 
             function renderSystray(systrayOutput) {
@@ -3292,6 +4516,8 @@ if ($response -eq [IntPtr]::Zero) {
             }
 
             function renderWeather(weatherOutput) {
+                elements.weather.classList.remove("weather-warm");
+
                 if (!state.userSettings.showWeather) {
                     clearElement(elements.weather);
                     toggleHidden(elements.weather, true);
@@ -3306,6 +4532,11 @@ if ($response -eq [IntPtr]::Zero) {
                     return;
                 }
 
+                const status = normalizeText(weatherOutput?.status);
+                if (status === "clear_day" || status === "clear_night") {
+                    elements.weather.classList.add("weather-warm");
+                }
+
                 elements.weather.appendChild(iconSpan(weatherState.icon));
                 elements.weather.appendChild(
                     textSpan("weather-text", weatherState.text),
@@ -3314,6 +4545,8 @@ if ($response -eq [IntPtr]::Zero) {
             }
 
             function renderNetwork(networkOutput) {
+                elements.network.classList.remove("network-offline");
+
                 if (!state.userSettings.showNetwork) {
                     clearElement(elements.network);
                     elements.network.onclick = null;
@@ -3323,9 +4556,14 @@ if ($response -eq [IntPtr]::Zero) {
 
                 const networkState = getNetworkState(networkOutput, {
                     cellularSignalStrength: state.cellularSignalStrength,
+                    cellularProviderName: state.cellularProviderName,
                 });
                 clearElement(elements.network);
                 elements.network.onclick = null;
+                elements.network.classList.toggle(
+                    "network-offline",
+                    networkState.icon === "󰤭",
+                );
                 elements.network.appendChild(iconSpan(networkState.icon));
                 elements.network.appendChild(
                     textSpan("network-text", networkState.text),
@@ -3337,6 +4575,8 @@ if ($response -eq [IntPtr]::Zero) {
             }
 
             function renderAudio(audioOutput) {
+                elements.audio.classList.remove("audio-muted");
+
                 if (!state.userSettings.showAudio) {
                     clearElement(elements.audio);
                     elements.audio.onwheel = null;
@@ -3355,6 +4595,7 @@ if ($response -eq [IntPtr]::Zero) {
                     return;
                 }
 
+                elements.audio.classList.toggle("audio-muted", audioState.isMuted);
                 elements.audio.appendChild(iconSpan(audioState.icon));
                 elements.audio.appendChild(
                     textSpan("audio-text", audioState.text),
@@ -3379,10 +4620,15 @@ if ($response -eq [IntPtr]::Zero) {
             }
 
             function renderBattery(batteryOutput) {
+                elements.battery.classList.remove(
+                    "warning",
+                    "battery-charging",
+                    "battery-low",
+                );
+
                 if (!state.userSettings.showBattery) {
                     clearElement(elements.battery);
                     elements.battery.onclick = null;
-                    elements.battery.classList.toggle("warning", false);
                     toggleHidden(elements.battery, true);
                     return;
                 }
@@ -3390,7 +4636,6 @@ if ($response -eq [IntPtr]::Zero) {
                 const batteryState = getBatteryState(batteryOutput);
                 clearElement(elements.battery);
                 elements.battery.onclick = null;
-                elements.battery.classList.toggle("warning", false);
 
                 if (!batteryState) {
                     toggleHidden(elements.battery, true);
@@ -3405,8 +4650,16 @@ if ($response -eq [IntPtr]::Zero) {
                     void openQuickSettings(event);
                 };
                 elements.battery.classList.toggle(
+                    "battery-charging",
+                    Boolean(batteryState.isCharging),
+                );
+                elements.battery.classList.toggle(
+                    "battery-low",
+                    Boolean(batteryState.isLow),
+                );
+                elements.battery.classList.toggle(
                     "warning",
-                    batteryState.isWarning,
+                    Boolean(batteryState.isWarning),
                 );
                 toggleHidden(elements.battery, false);
             }
@@ -3415,10 +4668,12 @@ if ($response -eq [IntPtr]::Zero) {
                 if (!state.userSettings.showPower) {
                     closePowerMenu();
                     toggleHidden(elements.power, true);
+                    syncLeftDivider();
                     return;
                 }
 
                 toggleHidden(elements.power, false);
+                syncLeftDivider();
             }
 
             initializeUserSettings();
@@ -3445,6 +4700,8 @@ if ($response -eq [IntPtr]::Zero) {
                 openZebarSettings,
                 openQuickSettings,
                 renderDate,
+                renderKomorebi,
+                renderMedia,
                 renderSystray,
                 renderWeather,
                 renderNetwork,
@@ -3464,9 +4721,7 @@ if ($response -eq [IntPtr]::Zero) {
             } else {
                 setupUserSettingsSync();
                 providers.onOutput((output) => {
-                    if (output.komorebi) {
-                        state.latestKomorebiOutput = output.komorebi;
-                    }
+                    handleKomorebiProviderOutput(output.komorebi);
 
                     state.latestDateOutput = output.date;
                     state.latestMediaOutput = output.media;
@@ -3484,9 +4739,11 @@ if ($response -eq [IntPtr]::Zero) {
 
                 providers.onError((errorMap) => {
                     if (errorMap?.komorebi) {
-                        state.latestKomorebiOutput = null;
-                        renderKomorebi(null);
-                        void refreshKomorebiState();
+                        // Keep the poll result; clear only if the poll fails
+                        // too (see handleKomorebiPollFailure).
+                        state.komorebiProviderErrored = true;
+                        state.lastProviderKomorebiOutput = null;
+                        void requestKomorebiRefresh();
                     }
 
                     console.error("Zebar provider error", errorMap);
