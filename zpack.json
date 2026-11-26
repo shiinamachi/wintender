@@ -85,6 +85,22 @@
                         "edge": "top",
                         "windowMargin": "0px"
                     }
+                },
+                {
+                    "name": "legacy",
+                    "anchor": "top_left",
+                    "offsetX": "0px",
+                    "offsetY": "0px",
+                    "width": "100%",
+                    "height": "32px",
+                    "monitorSelection": {
+                        "type": "all"
+                    },
+                    "dockToEdge": {
+                        "enabled": true,
+                        "edge": "top",
+                        "windowMargin": "0px"
+                    }
                 }
             ],
             "providers": [
