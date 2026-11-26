@@ -7,7 +7,7 @@
             content="width=device-width, initial-scale=1.0"
         />
         <title>Wintender Settings</title>
-        <style>
+        <style data-wintender-theme="sakura-night">
             :root {
                 --panel-bg: linear-gradient(
                     165deg,
@@ -417,6 +417,359 @@
                 box-shadow: 0 0 12px rgba(255, 126, 182, 0.28);
             }
         </style>
+        <style data-wintender-theme="legacy" media="not all">
+            :root {
+                --panel-bg: rgba(20, 20, 25, 0.9);
+                --panel-border: rgba(255, 255, 255, 0.08);
+                --panel-muted: #9a9aa4;
+                --panel-text: #e0e0e0;
+                --panel-accent: #89b4fa;
+                --panel-hover: rgba(255, 255, 255, 0.08);
+                --panel-input: rgba(255, 255, 255, 0.06);
+                --panel-preview: rgba(255, 255, 255, 0.04);
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            body {
+                font-family:
+                    "JetBrainsMonohangul NF Regular", "JetBrainsMono Nerd Font",
+                    "CaskaydiaCove Nerd Font", "Segoe UI", monospace;
+                font-size: 13px;
+                color: var(--panel-text);
+                background: transparent;
+            }
+
+            .shell {
+                height: 100%;
+                padding: 10px;
+                overflow: hidden;
+            }
+
+            .panel {
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+                height: 100%;
+                overflow-y: auto;
+                overflow-x: hidden;
+                padding: 18px;
+                border: 1px solid var(--panel-border);
+                border-radius: 18px;
+                background: var(--panel-bg);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+            }
+
+            .panel::-webkit-scrollbar {
+                width: 10px;
+            }
+
+            .panel::-webkit-scrollbar-thumb {
+                border: 2px solid transparent;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.18);
+                background-clip: padding-box;
+            }
+
+            .header {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .title {
+                font-size: 18px;
+                font-weight: 700;
+            }
+
+            .subtitle {
+                color: var(--panel-muted);
+                line-height: 1.5;
+            }
+
+            .section {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .section-label {
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: var(--panel-muted);
+            }
+
+            .setting-list {
+                display: grid;
+                gap: 10px;
+            }
+
+            .setting-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                padding: 12px 14px;
+                border: 1px solid var(--panel-border);
+                border-radius: 12px;
+                background: var(--panel-preview);
+            }
+
+            .setting-copy {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .setting-title {
+                font-weight: 600;
+            }
+
+            .setting-description {
+                color: var(--panel-muted);
+                line-height: 1.4;
+            }
+
+            .toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: flex-start;
+                position: relative;
+                flex: 0 0 auto;
+                width: 52px;
+                height: 30px;
+                cursor: pointer;
+            }
+
+            .toggle input {
+                position: absolute;
+                opacity: 0;
+                inset: 0;
+                cursor: pointer;
+            }
+
+            .toggle-track {
+                display: block;
+                width: 100%;
+                height: 100%;
+                border: 1px solid var(--panel-border);
+                border-radius: 999px;
+                background: var(--panel-preview);
+                transition:
+                    background 0.18s ease,
+                    border-color 0.18s ease,
+                    box-shadow 0.18s ease;
+            }
+
+            .toggle-thumb {
+                position: absolute;
+                top: 4px;
+                left: 4px;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #f3f5f8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+                transition:
+                    transform 0.18s ease,
+                    background 0.18s ease,
+                    border-color 0.18s ease;
+            }
+
+            .toggle:hover .toggle-track {
+                border-color: rgba(255, 255, 255, 0.12);
+                background: rgba(255, 255, 255, 0.06);
+            }
+
+            .toggle input:checked + .toggle-track {
+                background: var(--panel-accent);
+            }
+
+            .toggle input:focus-visible + .toggle-track {
+                box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+            }
+
+            .toggle input:checked + .toggle-track + .toggle-thumb {
+                transform: translateX(22px);
+                background: #ffffff;
+                border-color: rgba(137, 180, 250, 0.18);
+            }
+
+            .field {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .field input {
+                width: 100%;
+                height: 40px;
+                padding: 0 12px;
+                border: 1px solid var(--panel-border);
+                border-radius: 10px;
+                background: var(--panel-input);
+                color: var(--panel-text);
+                font: inherit;
+                outline: none;
+            }
+
+            .field input:focus {
+                border-color: rgba(137, 180, 250, 0.5);
+                box-shadow: 0 0 0 1px rgba(137, 180, 250, 0.24);
+            }
+
+            .field-hint {
+                color: var(--panel-muted);
+                line-height: 1.5;
+            }
+
+            .preview {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                padding: 12px 14px;
+                border: 1px solid var(--panel-border);
+                border-radius: 12px;
+                background: var(--panel-preview);
+            }
+
+            .preview-value {
+                color: var(--panel-accent);
+                font-size: 15px;
+                font-weight: 600;
+                line-height: 1.4;
+            }
+
+            .token-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .token {
+                padding: 4px 8px;
+                border-radius: 999px;
+                background: var(--panel-hover);
+                color: var(--panel-muted);
+                font-size: 12px;
+            }
+
+            .chip-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                width: 100%;
+                min-width: 0;
+            }
+
+            .chip-button,
+            .chip-static {
+                display: inline-flex;
+                align-items: flex-start;
+                gap: 6px;
+                min-height: 30px;
+                max-width: 100%;
+                min-width: 0;
+                padding: 6px 10px;
+                border: 1px solid var(--panel-border);
+                border-radius: 999px;
+                background: var(--panel-preview);
+                color: var(--panel-text);
+                font: inherit;
+                line-height: 1.4;
+            }
+
+            .chip-button {
+                text-align: left;
+                cursor: pointer;
+                transition:
+                    background 0.18s ease,
+                    border-color 0.18s ease,
+                    color 0.18s ease;
+            }
+
+            .chip-text {
+                flex: 1 1 auto;
+                min-width: 0;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
+
+            .chip-button:hover {
+                background: var(--panel-hover);
+            }
+
+            .chip-button-active {
+                background: var(--panel-accent);
+                border-color: var(--panel-accent);
+                color: #11141b;
+            }
+
+            .chip-remove {
+                flex: 0 0 auto;
+                align-self: flex-start;
+                border: 0;
+                padding: 2px;
+                border-radius: 6px;
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                line-height: 1;
+                cursor: pointer;
+                opacity: 0.72;
+            }
+
+            .chip-remove:hover {
+                background: var(--panel-hover);
+                opacity: 1;
+            }
+
+            .field-row {
+                display: flex;
+                gap: 8px;
+            }
+
+            .field-row input {
+                flex: 1;
+            }
+
+            .action-button {
+                height: 40px;
+                padding: 0 14px;
+                border: 1px solid var(--panel-border);
+                border-radius: 10px;
+                background: var(--panel-preview);
+                color: var(--panel-text);
+                font: inherit;
+                cursor: pointer;
+                transition:
+                    background 0.18s ease,
+                    border-color 0.18s ease;
+            }
+
+            .action-button:hover {
+                background: var(--panel-hover);
+                border-color: rgba(255, 255, 255, 0.12);
+            }
+        </style>
+        <script src="./resources/theme.js"></script>
     </head>
     <body>
         <div class="shell">
@@ -428,6 +781,31 @@
                         center clock format. Changes are applied immediately.
                     </p>
                 </header>
+
+                <section class="section">
+                    <h2 class="section-label">Theme</h2>
+                    <div id="theme-options" class="chip-list">
+                        <button
+                            class="chip-button"
+                            type="button"
+                            data-theme-option="sakura-night"
+                        >
+                            <span class="chip-text">Sakura Night</span>
+                        </button>
+                        <button
+                            class="chip-button"
+                            type="button"
+                            data-theme-option="legacy"
+                        >
+                            <span class="chip-text">Legacy</span>
+                        </button>
+                    </div>
+                    <span class="field-hint">
+                        Legacy restores the original flat bar. Start the
+                        top-bar widget with the `legacy` preset in Zebar to
+                        also restore its original 32px height.
+                    </span>
+                </section>
 
                 <section class="section">
                     <h2 class="section-label">Visibility</h2>
@@ -663,7 +1041,9 @@
                 showBattery: true,
                 clockFormat: "",
                 pinnedTrayApps: [],
+                theme: "sakura-night",
             });
+            const THEMES = ["sakura-night", "legacy"];
             const CLOCK_TOKEN_PATTERN =
                 /yyyy|dddd|ddd|yy|MM|M|dd|d|HH|H|hh|h|mm|m|ss|s|tt/g;
             const PREVIEW_REFRESH_INTERVAL = 1000;
@@ -692,6 +1072,9 @@
                 ),
                 trayPinDetectedList: document.getElementById(
                     "tray-pin-detected-list",
+                ),
+                themeOptions: Array.from(
+                    document.querySelectorAll("[data-theme-option]"),
                 ),
             };
 
@@ -807,6 +1190,10 @@
                     settings.pinnedTrayApps = sanitizePinnedTrayApps(
                         rawSettings.pinnedTrayApps,
                     );
+                }
+
+                if (THEMES.includes(rawSettings.theme)) {
+                    settings.theme = rawSettings.theme;
                 }
 
                 return settings;
@@ -1198,7 +1585,19 @@
                 });
             }
 
+            function renderTheme() {
+                globalThis.wintenderTheme?.applyTheme?.(state.userSettings.theme);
+                elements.themeOptions.forEach((button) => {
+                    const isActive =
+                        button.dataset.themeOption === state.userSettings.theme;
+
+                    button.classList.toggle("chip-button-active", isActive);
+                    button.setAttribute("aria-pressed", String(isActive));
+                });
+            }
+
             function renderForm() {
+                renderTheme();
                 elements.showPower.checked = state.userSettings.showPower;
                 elements.showKomorebiWorkspaces.checked =
                     state.userSettings.showKomorebiWorkspaces;
@@ -1226,7 +1625,22 @@
                     showBattery: elements.showBattery.checked,
                     clockFormat: elements.clockFormat.value,
                     pinnedTrayApps: state.userSettings.pinnedTrayApps,
+                    theme: state.userSettings.theme,
                 });
+            }
+
+            function setTheme(theme) {
+                if (!THEMES.includes(theme) || theme === state.userSettings.theme) {
+                    return;
+                }
+
+                state.userSettings = mergeUserSettings({
+                    ...state.userSettings,
+                    theme,
+                });
+                persistSanitizedUserSettings();
+                renderTheme();
+                broadcastUserSettings();
             }
 
             function persistPinnedTrayApps(nextPinnedTrayApps) {
@@ -1363,6 +1777,11 @@
                 });
                 elements.clockFormat.addEventListener("input", () => {
                     persistUserSettings();
+                });
+                elements.themeOptions.forEach((button) => {
+                    button.addEventListener("click", () => {
+                        setTheme(button.dataset.themeOption);
+                    });
                 });
                 elements.trayPinAdd.addEventListener("click", () => {
                     addPinnedTrayApp(elements.trayPinInput.value);

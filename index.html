@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>wintender Top Bar</title>
-        <style>
+        <style data-wintender-theme="sakura-night">
             :root {
                 --void: #070d1a;
                 --surface: #0f182d;
@@ -713,6 +713,341 @@
                 display: none !important;
             }
         </style>
+        <style data-wintender-theme="legacy" media="not all">
+            :root {
+                --bar-bg: rgba(20, 20, 25, 0.82);
+                --text-primary: #e0e0e0;
+                --text-secondary: #808080;
+                --accent: #89b4fa;
+                --warning: #f38ba8;
+                --hover: rgba(255, 255, 255, 0.1);
+                --border: rgba(255, 255, 255, 0.06);
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                min-height: 32px;
+                overflow: hidden;
+            }
+
+            body {
+                position: relative;
+                font-family:
+                    "JetBrainsMonohangul NF Regular", "JetBrainsMono Nerd Font",
+                    "CaskaydiaCove Nerd Font", "Segoe UI", monospace;
+                font-size: 13px;
+                color: var(--text-primary);
+                user-select: none;
+            }
+
+            .bar {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                align-items: center;
+                gap: 12px;
+                height: 32px;
+                width: 100%;
+                padding: 0 14px;
+                background: var(--bar-bg);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border-bottom: 1px solid var(--border);
+            }
+
+            .section {
+                display: flex;
+                align-items: center;
+                min-width: 0;
+                gap: 12px;
+            }
+
+            .section-left {
+                justify-content: flex-start;
+                overflow: hidden;
+            }
+
+            .section-center {
+                justify-content: center;
+            }
+
+            .section-right {
+                justify-content: flex-end;
+                overflow: hidden;
+            }
+
+            .media-pill {
+                flex: 1 1 0;
+                min-width: 0;
+                overflow: hidden;
+            }
+
+            .left-status-item,
+            .right-status-item {
+                flex: 0 0 auto;
+            }
+
+            .tray {
+                display: flex;
+                align-items: center;
+                min-width: 0;
+                gap: 6px;
+            }
+
+            .workspaces {
+                display: flex;
+                align-items: center;
+                min-width: 0;
+                gap: 6px;
+                overflow: hidden;
+            }
+
+            .pill {
+                display: inline-flex;
+                align-items: center;
+                min-width: 0;
+                gap: 6px;
+                height: 24px;
+                padding: 0 8px;
+                border-radius: 6px;
+                white-space: nowrap;
+            }
+
+            .pill {
+                color: var(--text-primary);
+            }
+
+            .interactive {
+                cursor: pointer;
+            }
+
+            .muted {
+                color: var(--text-secondary);
+            }
+
+            .workspace-text {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .media-text {
+                flex: 1 1 auto;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .workspace-pill {
+                max-width: 96px;
+                border: 0;
+                background: transparent;
+                color: var(--text-primary);
+                font: inherit;
+                transition:
+                    background 0.15s ease,
+                    color 0.15s ease;
+            }
+
+            .workspace-pill-active {
+                background: rgba(137, 180, 250, 0.18);
+                color: var(--accent);
+            }
+
+            .interactive:hover {
+                background: var(--hover);
+            }
+
+            .interactive-active {
+                background: var(--hover);
+            }
+
+            .datetime {
+                min-width: 0;
+            }
+
+            .status-icon {
+                flex: 0 0 auto;
+                font-size: 14px;
+                line-height: 1;
+            }
+
+            .tray {
+                position: relative;
+                padding: 0 2px;
+            }
+
+            .tray-overflow {
+                position: relative;
+            }
+
+            .tray-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 22px;
+                height: 22px;
+                border: 0;
+                border-radius: 5px;
+                background: transparent;
+                cursor: pointer;
+                transition: background 0.15s ease;
+            }
+
+            .tray-button:hover {
+                background: var(--hover);
+            }
+
+            .tray-button img {
+                width: 16px;
+                height: 16px;
+            }
+
+            .tray-more {
+                min-width: 30px;
+                padding: 0 6px;
+                color: var(--text-secondary);
+                font-size: 12px;
+            }
+
+            .tray-popover {
+                position: absolute;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-height: 30px;
+                padding: 6px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                background: rgba(24, 24, 30, 0.94);
+                backdrop-filter: blur(18px);
+                -webkit-backdrop-filter: blur(18px);
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+                z-index: 10;
+            }
+
+            .top-bar-context-menu {
+                position: absolute;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                min-width: 172px;
+                padding: 6px;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                background: rgba(24, 24, 30, 0.96);
+                backdrop-filter: blur(18px);
+                -webkit-backdrop-filter: blur(18px);
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+                z-index: 20;
+            }
+
+            .top-bar-context-menu-item,
+            .power-menu-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                min-height: 30px;
+                padding: 0 10px;
+                border: 0;
+                border-radius: 7px;
+                background: transparent;
+                color: var(--text-primary);
+                font: inherit;
+                text-align: left;
+                cursor: pointer;
+                transition:
+                    background 0.15s ease,
+                    color 0.15s ease;
+            }
+
+            .top-bar-context-menu-item:hover,
+            .power-menu-item:hover {
+                background: var(--hover);
+                color: var(--accent);
+            }
+
+            #power .status-icon {
+                font-size: 14px;
+            }
+
+            .power-menu {
+                position: absolute;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                min-width: 180px;
+                padding: 6px;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                background: rgba(24, 24, 30, 0.96);
+                backdrop-filter: blur(18px);
+                -webkit-backdrop-filter: blur(18px);
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+                left: 14px;
+                top: 38px;
+                z-index: 20;
+            }
+
+            .power-menu-item-danger:hover {
+                background: rgba(243, 139, 168, 0.15);
+                color: var(--warning);
+            }
+
+            .power-menu-separator {
+                height: 1px;
+                margin: 4px 10px;
+                background: var(--border);
+            }
+
+            .power-menu-status {
+                margin: 2px 4px 0;
+                padding: 6px 8px 0;
+                border-top: 1px solid var(--border);
+                color: var(--warning);
+                font-size: 11px;
+                line-height: 1.4;
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
+
+            .warning {
+                color: var(--warning);
+            }
+
+            .hidden {
+                display: none !important;
+            }
+
+            /* Added with the theme option: follow the docked window height
+               and keep newer elements consistent with the original look. */
+            body {
+                min-height: var(--top-bar-height, 32px);
+            }
+
+            .bar {
+                height: var(--top-bar-height, 32px);
+            }
+
+            .island-divider {
+                display: none;
+            }
+
+            .workspace-pill-active.workspace-pill-unfocused {
+                background: rgba(137, 180, 250, 0.08);
+                color: var(--text-secondary);
+            }
+        </style>
+        <script src="./resources/theme.js"></script>
     </head>
     <body>
         <div class="bar">
@@ -779,10 +1114,33 @@
                 "-WindowStyle",
                 "Hidden",
             ];
-            const TOP_BAR_HEIGHT = 38;
-            const TOP_BAR_CONTEXT_MENU_WIDTH = 186;
+            const DEFAULT_THEME = "sakura-night";
+            // Sizes that differ per theme. Menu widths match each theme's CSS.
+            const THEME_METRICS = Object.freeze({
+                "sakura-night": Object.freeze({
+                    topBarHeight: 38,
+                    contextMenuWidth: 186,
+                    powerMenuWidth: 186,
+                    popupMinOffsetY: 44,
+                    settingsOffsetX: "-10px",
+                    settingsOffsetY: "44px",
+                }),
+                legacy: Object.freeze({
+                    topBarHeight: 32,
+                    contextMenuWidth: 172,
+                    powerMenuWidth: 180,
+                    popupMinOffsetY: 36,
+                    settingsOffsetX: "0px",
+                    settingsOffsetY: "40px",
+                }),
+            });
+            // Zebar reserves the docked area from the preset the bar starts
+            // with ("default" is 38px, "legacy" is 32px), so the closed bar keeps
+            // that height. It is read once, before any menu enlarges the window.
+            const DOCKED_WINDOW_HEIGHT = Math.round(
+                Number(globalThis.innerHeight) || 0,
+            );
             const TOP_BAR_CONTEXT_MENU_MARGIN = 8;
-            const POWER_MENU_WIDTH = 186;
             const POWER_MENU_MARGIN = 8;
             const POWER_AVAILABILITY_CACHE_DURATION_MS = 30000;
             const ZEBAR_SETTINGS_WINDOW_TIMEOUT_MS = 1500;
@@ -810,6 +1168,7 @@
                 showBattery: true,
                 clockFormat: "",
                 pinnedTrayApps: [],
+                theme: DEFAULT_THEME,
             });
             const CLOCK_TOKEN_PATTERN =
                 /yyyy|dddd|ddd|yy|MM|M|dd|d|HH|H|hh|h|mm|m|ss|s|tt/g;
@@ -1050,7 +1409,36 @@
                     );
                 }
 
+                if (Object.hasOwn(THEME_METRICS, rawSettings.theme)) {
+                    settings.theme = rawSettings.theme;
+                }
+
                 return settings;
+            }
+
+            function isLegacyTheme() {
+                return state.userSettings.theme === "legacy";
+            }
+
+            function getThemeMetrics() {
+                return (
+                    THEME_METRICS[state.userSettings.theme] ??
+                    THEME_METRICS[DEFAULT_THEME]
+                );
+            }
+
+            function getTopBarHeight() {
+                return DOCKED_WINDOW_HEIGHT >= 24 && DOCKED_WINDOW_HEIGHT <= 64
+                    ? DOCKED_WINDOW_HEIGHT
+                    : getThemeMetrics().topBarHeight;
+            }
+
+            function applyTheme() {
+                globalThis.wintenderTheme?.applyTheme?.(state.userSettings.theme);
+                document.documentElement.style.setProperty(
+                    "--top-bar-height",
+                    `${getTopBarHeight()}px`,
+                );
             }
 
             function safeJsonParse(text) {
@@ -1237,6 +1625,11 @@
                     previousSettings,
                     nextSettings: state.userSettings,
                 });
+                applyTheme();
+
+                if (previousSettings.theme !== state.userSettings.theme) {
+                    void syncTopBarOverlaySize();
+                }
 
                 if (rerender) {
                     renderAllCurrentState();
@@ -2563,7 +2956,10 @@
                     8,
                     Math.round(anchorRect.right - popupWidth),
                 );
-                const offsetY = Math.max(44, Math.round(anchorRect.bottom + 8));
+                const offsetY = Math.max(
+                    getThemeMetrics().popupMinOffsetY,
+                    Math.round(anchorRect.bottom + 8),
+                );
 
                 try {
                     await zebar.startWidget(
@@ -2601,7 +2997,10 @@
                     8,
                     Math.round(anchorRect.right - popupWidth),
                 );
-                const offsetY = Math.max(44, Math.round(anchorRect.bottom + 8));
+                const offsetY = Math.max(
+                    getThemeMetrics().popupMinOffsetY,
+                    Math.round(anchorRect.bottom + 8),
+                );
 
                 return {
                     anchor: "top_left",
@@ -3158,12 +3557,12 @@ if ($response -eq [IntPtr]::Zero) {
                     Number.isFinite(window?.innerWidth) &&
                     window.innerWidth > 0
                         ? window.innerWidth
-                        : TOP_BAR_CONTEXT_MENU_WIDTH +
+                        : getThemeMetrics().contextMenuWidth +
                           TOP_BAR_CONTEXT_MENU_MARGIN * 2;
                 const maxLeft = Math.max(
                     TOP_BAR_CONTEXT_MENU_MARGIN,
                     viewportWidth -
-                        TOP_BAR_CONTEXT_MENU_WIDTH -
+                        getThemeMetrics().contextMenuWidth -
                         TOP_BAR_CONTEXT_MENU_MARGIN,
                 );
 
@@ -3174,7 +3573,7 @@ if ($response -eq [IntPtr]::Zero) {
                         maxLeft,
                     ),
                     top: Math.max(
-                        TOP_BAR_HEIGHT + 6,
+                        getTopBarHeight() + 6,
                         Math.round(clientY),
                     ),
                 };
@@ -3193,12 +3592,12 @@ if ($response -eq [IntPtr]::Zero) {
                 const menuWidth =
                     Number.isFinite(menuRect?.width) && menuRect.width > 0
                         ? Math.ceil(menuRect.width)
-                        : POWER_MENU_WIDTH;
+                        : getThemeMetrics().powerMenuWidth;
                 const viewportWidth =
                     Number.isFinite(window?.innerWidth) &&
                     window.innerWidth > 0
                         ? window.innerWidth
-                        : POWER_MENU_WIDTH + POWER_MENU_MARGIN * 2;
+                        : getThemeMetrics().powerMenuWidth + POWER_MENU_MARGIN * 2;
                 const maxLeft = Math.max(
                     POWER_MENU_MARGIN,
                     viewportWidth - menuWidth - POWER_MENU_MARGIN,
@@ -3208,11 +3607,11 @@ if ($response -eq [IntPtr]::Zero) {
                     : POWER_MENU_MARGIN;
                 const buttonBottom = Number.isFinite(buttonRect?.bottom)
                     ? Math.round(buttonRect.bottom)
-                    : TOP_BAR_HEIGHT;
+                    : getTopBarHeight();
 
                 return {
                     left: clamp(buttonLeft, POWER_MENU_MARGIN, maxLeft),
-                    top: Math.max(TOP_BAR_HEIGHT + 6, buttonBottom + 6),
+                    top: Math.max(getTopBarHeight() + 6, buttonBottom + 6),
                 };
             }
 
@@ -3245,15 +3644,15 @@ if ($response -eq [IntPtr]::Zero) {
                 }
 
                 if (menu === elements.powerMenu) {
-                    return POWER_MENU_WIDTH + POWER_MENU_MARGIN * 2;
+                    return getThemeMetrics().powerMenuWidth + POWER_MENU_MARGIN * 2;
                 }
 
-                return TOP_BAR_CONTEXT_MENU_WIDTH + TOP_BAR_CONTEXT_MENU_MARGIN * 2;
+                return getThemeMetrics().contextMenuWidth + TOP_BAR_CONTEXT_MENU_MARGIN * 2;
             }
 
             function getTopBarOverlayHeight(menu) {
                 if (!menu) {
-                    return TOP_BAR_HEIGHT;
+                    return getTopBarHeight();
                 }
 
                 const rect =
@@ -3272,7 +3671,7 @@ if ($response -eq [IntPtr]::Zero) {
                         : TOP_BAR_CONTEXT_MENU_MARGIN;
 
                 return (
-                    TOP_BAR_HEIGHT +
+                    getTopBarHeight() +
                     (measuredHeight ?? fallbackHeight) +
                     menuMargin * 2
                 );
@@ -3504,8 +3903,8 @@ if ($response -eq [IntPtr]::Zero) {
             function getWintenderSettingsPlacement() {
                 return {
                     anchor: "top_right",
-                    offsetX: "-10px",
-                    offsetY: "44px",
+                    offsetX: getThemeMetrics().settingsOffsetX,
+                    offsetY: getThemeMetrics().settingsOffsetY,
                     width: `${WINTENDER_SETTINGS_WIDTH}px`,
                     height: `${WINTENDER_SETTINGS_HEIGHT}px`,
                     monitorSelection: { type: "primary" },
@@ -3763,6 +4162,12 @@ if ($response -eq [IntPtr]::Zero) {
 
             function renderDate(dateOutput) {
                 const formatted = formatDate(dateOutput?.now);
+
+                if (isLegacyTheme()) {
+                    elements.datetime.textContent = formatted;
+                    return;
+                }
+
                 const { datePart, timePart } = splitClockDisplay(formatted);
                 clearElement(elements.datetime);
 
@@ -4011,9 +4416,9 @@ if ($response -eq [IntPtr]::Zero) {
                         button.classList.add("workspace-pill-occupied");
                     }
 
-                    const labelMatch = String(item.label).match(
-                        /^(\d+)[-:\s]+(.+)$/,
-                    );
+                    const labelMatch = isLegacyTheme()
+                        ? null
+                        : String(item.label).match(/^(\d+)[-:\s]+(.+)$/);
 
                     if (labelMatch) {
                         button.appendChild(textSpan("ws-index", labelMatch[1]));
