@@ -1,8 +1,8 @@
 {
     "$schema": "https://github.com/glzr-io/zebar/raw/v3.1.1/resources/zpack-schema.json",
     "name": "wintender",
-    "version": "1.2.0-sakuranight",
-    "description": "wintender top bar for Windows 11 (Sakura Night Cyber Acrylic edition)",
+    "version": "1.2.0",
+    "description": "wintender top bar for Windows 11",
     "tags": ["status-bar"],
     "repositoryUrl": "https://github.com/shiinamachi/wintender",
     "previewImages": [
