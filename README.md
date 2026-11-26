@@ -16,6 +16,14 @@ Since this is a project primarily for personal use, issues that are reported may
   - Show zebar settings
   - Show wintender settings
 - Customizable
+- Themes
+  - Sakura Night (default): floating acrylic islands in night-sakura pink and nebula cyan
+  - Legacy: the original flat bar (choose it in wintender settings)
+
+## Themes
+Pick a theme in the Theme section of wintender settings. The change applies to the top bar and every popup immediately.
+
+The Sakura Night bar is 38px tall and the Legacy bar is 32px tall. Zebar reserves the bar's space from the preset it starts with, so when you use the Legacy theme, start the `top-bar` widget with the `legacy` preset in Zebar settings to get the original height. With the `default` preset, the Legacy bar fills the 38px space.
 
 ## Screenshots
 ![Top Bar](https://raw.githubusercontent.com/shiinamachi/wintender/main/images/preview_1.png)
